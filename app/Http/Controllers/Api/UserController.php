@@ -42,7 +42,7 @@ class UserController extends Controller
             }
         }
 
-        $users = $query->orderBy('id', 'desc')->paginate($perPage);
+        $users = $query->where("role", "bhw")->orderBy('id', 'desc')->paginate($perPage);
 
         $roleCounts = [
             'total'      => User::count(),
@@ -60,22 +60,26 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'username' => ['required', 'string', 'lowercase', 'unique:'.User::class],
             'name' => ['required', 'string', 'max:255'],
+            'contact_number' => ['required', 'string', 'max:11', 'min:11'],
+            'hw_id' => ['required', 'string', 'max:255'],
+            'area' => ['required', 'string', 'max:255'],
+            'notes' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'role' => ['required', 'string'],
         ]);
 
         $user = User::create([
-            'username' => $request->username,
             'name' => $request->name,
-            'email' => $request->email,
+            'contact_number' => $request->contact_number,
+            'hw_id' => $request->hw_id,
+            'area' => $request->area,
+            'notes' => $request->notes,
             'password' => Hash::make(1234),
+            'email' => $request->email,
             'email_verified_at' => Carbon::now(),
             'role' => $request->role,
         ]);
-
-        // $user->notify(new VerifyEmailNotification());
 
         return response()->noContent();
     }

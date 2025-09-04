@@ -3,6 +3,7 @@
 use App\Exports\RegisteredMembersExport;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MemberController;
+use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\RegisteredMemberController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\UserController;
@@ -21,17 +22,25 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
         // Route::post('/account', [AuthController::class, 'register']);
         // Route::post('/account/batch-delete', [UserController::class, 'batchDelete']);
         // Route::post('/account/batch-update', [UserController::class, 'batchUpdateStatus']);
-
+        
         Route::prefix('/users')->group(function(){
             Route::get('/', [UserController::class, 'index']);
             Route::post('/', [UserController::class, 'store']);
             Route::get('/{id}', [UserController::class, 'show']);
             Route::put('/{id}', [UserController::class, 'update']);
-            Route::put('/role', [UserController::class, 'updateRole']);
-            Route::put('/status', [UserController::class, 'updateStatus']);
             Route::delete('/', [UserController::class, 'delete']);
+        });
 
-            Route::put('/reset-password-default', [UserController::class, 'resetPasswordDefault']);
+        Route::prefix('/patients')->group(function(){
+            Route::get('/', [PatientController::class, 'index']);
+            Route::post('/', [PatientController::class, 'store']);
+            Route::put('/', [PatientController::class, 'update']);
+            Route::delete('/', [PatientController::class, 'delete']);
+        });
+
+        Route::prefix('/settings')->group(function(){
+            Route::get('/', [SettingController::class, 'index']);
+            Route::post('/', [SettingController::class, 'save']);
         });
         
     });
