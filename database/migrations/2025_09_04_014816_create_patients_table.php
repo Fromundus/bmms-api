@@ -27,12 +27,14 @@ return new class extends Migration
             $table->string("weight_for_ltht_status"); //normal
             $table->string("contact_number");
 
-            $table->text("immunizations");
+            $table->text("immunizations")->nullable();
             $table->date("last_deworming_date")->nullable();
             $table->string("allergies")->nullable();
             $table->text("medical_history")->nullable();
-            $table->text("notes");
+            $table->text("notes")->nullable();
             
+            $table->string("status")->nullable();
+
             $table->timestamps();
         });
     }

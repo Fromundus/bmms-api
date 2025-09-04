@@ -26,5 +26,7 @@ class Patient extends Model
         "allergies",
         "medical_history",
         "notes",
+
+        "status",
     ];
 }

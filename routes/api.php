@@ -31,10 +31,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
             Route::delete('/', [UserController::class, 'delete']);
         });
 
+        Route::get('/getStats', [PatientController::class, 'getStats']);
+
         Route::prefix('/patients')->group(function(){
             Route::get('/', [PatientController::class, 'index']);
             Route::post('/', [PatientController::class, 'store']);
-            Route::put('/', [PatientController::class, 'update']);
+            Route::get('/{id}', [PatientController::class, 'show']);
+            Route::put('/{id}', [PatientController::class, 'update']);
             Route::delete('/', [PatientController::class, 'delete']);
         });
 
