@@ -13,40 +13,37 @@ class PatientController extends Controller
 {
     public function getStats()
     {
-        $totalPatients = Patient::count();
+        // Load all patients with their latest record
+        $patients = Patient::with('latestRecord')->get();
 
-        $severe = Patient::where("status", "Severe")->count();
-        $moderate = Patient::where("status", "Moderate")->count();
-        $atRisk = Patient::where("status", "At Risk")->count();
-        $healthy = Patient::where("status", "Healthy")->count();
+        $totalPatients = $patients->count();
 
-        // Prevent division by zero
-        $percent = function ($count) use ($totalPatients) {
-            return $totalPatients > 0 ? round(($count / $totalPatients) * 100, 2) : 0;
-        };
+        $counts = [
+            'Severe'   => 0,
+            'Moderate' => 0,
+            'At Risk'  => 0,
+            'Healthy'  => 0,
+        ];
+
+        foreach ($patients as $patient) {
+            $status = $patient->latestRecord?->status;
+
+            if ($status && isset($counts[$status])) {
+                $counts[$status]++;
+            }
+        }
+
+        // Helper to compute %
+        $percent = fn($count) => $totalPatients > 0
+            ? round(($count / $totalPatients) * 100, 2)
+            : 0;
 
         return response()->json([
             'total_patients' => $totalPatients,
-
-            'severe' => [
-                'count' => $severe,
-                'percent' => $percent($severe)
-            ],
-
-            'moderate' => [
-                'count' => $moderate,
-                'percent' => $percent($moderate)
-            ],
-
-            'at_risk' => [
-                'count' => $atRisk,
-                'percent' => $percent($atRisk)
-            ],
-
-            'healthy' => [
-                'count' => $healthy,
-                'percent' => $percent($healthy)
-            ],
+            'severe'   => ['count' => $counts['Severe'],   'percent' => $percent($counts['Severe'])],
+            'moderate' => ['count' => $counts['Moderate'], 'percent' => $percent($counts['Moderate'])],
+            'at_risk'  => ['count' => $counts['At Risk'],  'percent' => $percent($counts['At Risk'])],
+            'healthy'  => ['count' => $counts['Healthy'],  'percent' => $percent($counts['Healthy'])],
         ]);
     }
 
@@ -228,7 +225,7 @@ class PatientController extends Controller
     //THIS IS FOR ADDING NEW RECORDS
     public function updateOrAddRecords(Request $request, $id)
     {
-        $patient = Patient::findOrFail($id);
+        $patient = Patient::with("latestRecord")->findOrFail($id);
 
         $validated = $request->validate([
             // 'name' => 'required|string',
@@ -252,15 +249,15 @@ class PatientController extends Controller
         // Recompute age if birthday or measured date changed
         if (isset($validated['birthday']) || isset($validated['date_measured'])) {
             $birthday = $validated['birthday'] ?? $patient->birthday;
-            $date_measured = $validated['date_measured'] ?? $patient->date_measured;
+            $date_measured = $validated['date_measured'] ?? $patient->latestRecord->date_measured;
             $validated['age'] = Carbon::parse($birthday)
                 ->diffInYears(Carbon::parse($date_measured));
         }
 
         // Recompute nutrition if weight/height updated
-        $weight = $validated['weight'] ?? $patient->weight;
-        $height = $validated['height'] ?? $patient->height;
-        $age = $validated['age'] ?? $patient->age;
+        $weight = $validated['weight'] ?? $patient->latestRecord->weight;
+        $height = $validated['height'] ?? $patient->latestRecord->height;
+        $age = $validated['age'] ?? $patient->latestRecord->age;
 
         $bmi = $weight / pow($height / 100, 2);
 
