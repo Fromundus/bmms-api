@@ -4,6 +4,7 @@ use App\Exports\PatientsExport;
 use App\Exports\RegisteredMembersExport;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MemberController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\RegisteredMemberController;
 use App\Http\Controllers\Api\ReportController;
@@ -47,6 +48,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
             Route::delete('/', [PatientController::class, 'delete']);
         });
 
+        
         //EXPORTS
         Route::get('/reports/patients/export/{type}', [ReportController::class, 'export']);
     });
@@ -55,14 +57,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
     Route::put('/updateuser/{id}', [UserController::class, 'update']);
     Route::put('/changepassword/{id}', [UserController::class, 'changePassword']);
 });
+Route::get('/notifications', [NotificationController::class, 'index']);
 
 Route::post('/login', [AuthController::class, 'login']);
-
-Route::get('/getlatestrecord', function(){
-    $r = PatientRecord::where("patient_id", 2)->latest("id")->first();
-
-    return response()->json(["data" => $r]);
-});
 
 Route::get('/test', function(){
     return response()->json([
