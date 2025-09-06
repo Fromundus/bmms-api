@@ -40,4 +40,11 @@ class Patient extends Model
         return $this->hasOne(PatientRecord::class)->latestOfMany('date_measured');
     }
 
+    public function latestRecordInRange($from, $to)
+    {
+        return $this->hasOne(PatientRecord::class)
+            ->whereBetween('date_measured', [$from, $to])
+            ->latestOfMany('date_measured');
+    }
+
 }

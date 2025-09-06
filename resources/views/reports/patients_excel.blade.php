@@ -1,7 +1,4 @@
-<h2>Patient Records Report</h2>
-<p>Generated at: {{ now() }}</p>
-
-<table border="1" cellpadding="5" cellspacing="0" width="100%">
+<table>
     <thead>
         <tr>
             <th>Name</th>

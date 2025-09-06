@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\RegisteredMemberController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\UserController;
 use App\Models\Patient;
@@ -47,16 +48,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
         });
 
         //EXPORTS
-        Route::get('/reports/patients/excel', function(){
-            return Excel::download(new PatientsExport, 'patients.xlsx');
-        });
-
-        Route::get('/reports/patients/pdf', function(){
-            $patients = Patient::all();
-            $pdf = Pdf::loadView('reports.patients', compact('patients'));
-            return $pdf->download('patients.pdf');
-        });
-
+        Route::get('/reports/patients/export/{type}', [ReportController::class, 'export']);
     });
     
     //USER ACCOUNTS
