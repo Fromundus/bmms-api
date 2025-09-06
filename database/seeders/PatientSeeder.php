@@ -86,16 +86,108 @@ class PatientSeeder extends Seeder
     //     }
     // }
 
+    // public function run(): void
+    // {
+    //     $faker = Faker::create();
+
+    //     // Get thresholds from settings table
+    //     $settings = Setting::first();
+    //     if (!$settings) {
+    //         $this->command->warn('⚠️ No settings found. Please seed settings first.');
+    //         return;
+    //     }
+
+    //     for ($i = 0; $i < 100; $i++) {
+    //         $birthday = $faker->dateTimeBetween('-80 years', '-1 years');
+    //         $dateMeasured = $faker->dateTimeBetween('-1 years', 'now');
+    //         $age = $birthday->diff($dateMeasured)->y;
+    //         $weight = $faker->numberBetween(3, 120); // kg
+    //         $height = $faker->numberBetween(50, 200); // cm
+
+    //         // Compute nutrition
+    //         $wfa = $this->computeWFA($weight, $settings);
+    //         $hfa = $this->computeHFA($height, $settings);
+    //         $wfs = $this->computeWFS($weight, $settings);
+
+    //         // Compute overall status
+    //         $status = $this->computeOverallStatus($wfa, $hfa, $wfs);
+
+    //         // Optional deworming date
+    //         $deworming = $faker->optional()->dateTimeBetween('-2 years', 'now');
+
+    //         DB::table('patients')->insert([
+    //             'name' => $faker->name,
+    //             'address' => $faker->address,
+    //             'belongs_to_ip' => $faker->randomElement(['Yes', 'No']),
+    //             'sex' => $faker->randomElement(['Male', 'Female']),
+    //             'birthday' => $birthday->format('Y-m-d'),
+    //             'date_measured' => $dateMeasured->format('Y-m-d'),
+    //             'weight' => $weight,
+    //             'height' => $height,
+    //             'age' => $age,
+    //             'weight_for_age' => $wfa,
+    //             'height_for_age' => $hfa,
+    //             'weight_for_ltht_status' => $wfs,
+    //             'contact_number' => $faker->phoneNumber,
+
+    //             'immunizations' => implode(', ', $faker->randomElements(
+    //                 ['BCG', 'DPT', 'Polio', 'Measles', 'Hepatitis B'],
+    //                 $faker->numberBetween(1, 5)
+    //             )),
+    //             'last_deworming_date' => $deworming ? $deworming->format('Y-m-d') : null,
+    //             'allergies' => $faker->optional()->word,
+    //             'medical_history' => $faker->optional()->sentence(10),
+    //             'notes' => $faker->sentence(15),
+
+    //             'status' => $status,
+
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
+    //     }
+    // }
+
+    // private function computeWFA($weight, $settings)
+    // {
+    //     if ($weight <= $settings->wfa_underweight) return 'Underweight';
+    //     if ($weight <= $settings->wfa_normal) return 'Normal';
+    //     return 'Overweight';
+    // }
+
+    // private function computeHFA($height, $settings)
+    // {
+    //     if ($height <= $settings->hfa_stunted) return 'Stunted';
+    //     if ($height <= $settings->hfa_normal) return 'Normal';
+    //     return 'Tall';
+    // }
+
+    // private function computeWFS($weight, $settings)
+    // {
+    //     if ($weight <= $settings->wfs_wasted) return 'Wasted';
+    //     if ($weight <= $settings->wfs_normal) return 'Normal';
+    //     return 'Obese';
+    // }
+
+    // private function computeOverallStatus($wfa, $hfa, $wfs)
+    // {
+    //     if ($wfs === 'Wasted' || $hfa === 'Stunted') {
+    //         return 'Severe'; // Red
+    //     }
+
+    //     if ($wfa === 'Underweight' || $wfa === 'Overweight' || $wfs === 'Obese') {
+    //         return 'Moderate'; // Orange
+    //     }
+
+    //     if ($hfa === 'Tall') {
+    //         return 'At Risk'; // Yellow
+    //     }
+
+    //     return 'Healthy'; // Green
+    // }
+
     public function run(): void
     {
         $faker = Faker::create();
-
-        // Get thresholds from settings table
-        $settings = Setting::first();
-        if (!$settings) {
-            $this->command->warn('⚠️ No settings found. Please seed settings first.');
-            return;
-        }
 
         for ($i = 0; $i < 100; $i++) {
             $birthday = $faker->dateTimeBetween('-80 years', '-1 years');
@@ -104,12 +196,15 @@ class PatientSeeder extends Seeder
             $weight = $faker->numberBetween(3, 120); // kg
             $height = $faker->numberBetween(50, 200); // cm
 
-            // Compute nutrition
-            $wfa = $this->computeWFA($weight, $settings);
-            $hfa = $this->computeHFA($height, $settings);
-            $wfs = $this->computeWFS($weight, $settings);
+            // Compute BMI
+            $bmi = $weight / pow($height / 100, 2);
 
-            // Compute overall status
+            // Compute categories
+            $wfa = $this->computeWFA($age, $weight);
+            $hfa = $this->computeHFA($age, $height);
+            $wfs = $this->computeWFHOrBMI($age, $bmi);
+
+            // Overall status
             $status = $this->computeOverallStatus($wfa, $hfa, $wfs);
 
             // Optional deworming date
@@ -118,7 +213,7 @@ class PatientSeeder extends Seeder
             DB::table('patients')->insert([
                 'name' => $faker->name,
                 'address' => $faker->address,
-                'belongs_to_ip' => $faker->company,
+                'belongs_to_ip' => $faker->randomElement(['Yes', 'No']),
                 'sex' => $faker->randomElement(['Male', 'Female']),
                 'birthday' => $birthday->format('Y-m-d'),
                 'date_measured' => $dateMeasured->format('Y-m-d'),
@@ -147,25 +242,43 @@ class PatientSeeder extends Seeder
         }
     }
 
-    private function computeWFA($weight, $settings)
+    private function computeWFA($age, $weight)
     {
-        if ($weight <= $settings->wfa_underweight) return 'Underweight';
-        if ($weight <= $settings->wfa_normal) return 'Normal';
-        return 'Overweight';
+        // Simplified: WHO would use exact Z-scores
+        if ($age < 5 && $weight < 10) return 'Underweight';
+        if ($age < 10 && $weight < 20) return 'Underweight';
+        if ($age >= 10 && $weight < 40) return 'Underweight';
+
+        if ($weight > 80) return 'Overweight';
+
+        return 'Normal';
     }
 
-    private function computeHFA($height, $settings)
+    private function computeHFA($age, $height)
     {
-        if ($height <= $settings->hfa_stunted) return 'Stunted';
-        if ($height <= $settings->hfa_normal) return 'Normal';
-        return 'Tall';
+        // Simplified: thresholds grow with age
+        if ($age < 5 && $height < 85) return 'Stunted';
+        if ($age < 10 && $height < 120) return 'Stunted';
+        if ($age >= 10 && $height < 150) return 'Stunted';
+
+        if ($height > 190) return 'Tall';
+
+        return 'Normal';
     }
 
-    private function computeWFS($weight, $settings)
+    private function computeWFHOrBMI($age, $bmi)
     {
-        if ($weight <= $settings->wfs_wasted) return 'Wasted';
-        if ($weight <= $settings->wfs_normal) return 'Normal';
-        return 'Obese';
+        if ($age < 20) {
+            // Child BMI-for-age (simplified cutoffs)
+            if ($bmi < 14) return 'Wasted';
+            if ($bmi > 21) return 'Obese';
+            return 'Normal';
+        } else {
+            // Adult BMI
+            if ($bmi < 18.5) return 'Wasted';
+            if ($bmi >= 30) return 'Obese';
+            return 'Normal';
+        }
     }
 
     private function computeOverallStatus($wfa, $hfa, $wfs)

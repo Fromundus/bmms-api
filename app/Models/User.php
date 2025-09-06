@@ -21,7 +21,6 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'contact_number',
-        'hw_id',
         'email',
         'area',
         'notes',
@@ -53,7 +52,7 @@ class User extends Authenticatable
         ];
     }
 
-    public function activityLogs(){
-        return $this->hasMany(ActivityLog::class);
-    }
+    // public function activityLogs(){
+    //     return $this->hasMany(ActivityLog::class);
+    // }
 }

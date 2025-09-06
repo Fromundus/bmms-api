@@ -17,19 +17,21 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
         User::factory()->create([
-            'name' => 'Barangay Health Worker',
+            'name' => 'Barangay Nutrition Scholar',
             'contact_number' => '09123456789',
-            'hw_id' => '1234',
-            'email' => 'bhw@test.com',
+            'email' => 'bns@test.com',
             'area' => 'Purok 1',
             'notes' => 'lorem ipsum',
             'password' => Hash::make("1234"),
-            'role' => 'bhw',
+            'role' => 'bns',
         ]);
 
         User::factory()->create([
-            'name' => 'Admin',
-            'email' => 'admin@test.com',
+            'name' => 'Barangay Health Worker',
+            'contact_number' => '09987654321',
+            'email' => 'bhw@test.com',
+            'area' => 'Purok 1',
+            'notes' => 'lorem ipsum',
             'password' => Hash::make("1234"),
             'role' => 'admin',
         ]);

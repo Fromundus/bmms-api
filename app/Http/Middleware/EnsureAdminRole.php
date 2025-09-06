@@ -17,7 +17,7 @@ class EnsureAdminRole
     {
         $user = $request->user();
 
-        if ($user && $user->role !== 'superadmin' && $user->role !== 'admin' && $user->role !== 'bhw') {
+        if ($user && $user->role !== 'superadmin' && $user->role !== 'admin' && $user->role !== 'bns') {
             // Revoke the current token
             // $request->user()->currentAccessToken()->delete();
             $request->user()->tokens()->delete();

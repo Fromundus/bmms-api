@@ -22,9 +22,9 @@ return new class extends Migration
             $table->integer("weight");
             $table->integer("height");
             $table->integer("age");
-            $table->string("weight_for_age"); //normal
-            $table->string("height_for_age"); //normal
-            $table->string("weight_for_ltht_status"); //normal
+            $table->string("weight_for_age"); //underweight //normal //overweight
+            $table->string("height_for_age"); //stunted //normal //tall
+            $table->string("weight_for_ltht_status"); //wasted //normal //obese
             $table->string("contact_number");
 
             $table->text("immunizations")->nullable();

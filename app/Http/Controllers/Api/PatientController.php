@@ -92,6 +92,110 @@ class PatientController extends Controller
         ]);
     }
 
+    public function show($id){
+        $patient = Patient::findOrFail($id);
+
+        return response()->json($patient);
+    }
+
+    // public function store(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'name' => 'required|string',
+    //         'address' => 'required|string',
+    //         'belongs_to_ip' => 'required|string',
+    //         'sex' => 'required|string|in:Male,Female',
+    //         'birthday' => 'required|date',
+    //         'date_measured' => 'required|date',
+    //         'weight' => 'required|integer',
+    //         'height' => 'required|integer',
+    //         'contact_number' => 'required|string',
+
+    //         'immunizations' => 'nullable|string',
+    //         'last_deworming_date' => 'nullable|date',
+    //         'allergies' => 'nullable|string',
+    //         'medical_history' => 'nullable|string',
+    //         'notes' => 'nullable|string',
+    //     ]);
+
+    //     // Calculate age
+    //     $validated['age'] = Carbon::parse($validated['birthday'])
+    //         ->diffInYears(Carbon::parse($validated['date_measured']));
+
+    //     // Fetch thresholds
+    //     $settings = Setting::firstOrFail();
+
+    //     // Compute nutritional status
+    //     $validated['weight_for_age'] = $this->computeWFA($validated['weight'], $settings);
+    //     $validated['height_for_age'] = $this->computeHFA($validated['height'], $settings);
+    //     $validated['weight_for_ltht_status'] = $this->computeWFS($validated['weight'], $settings);
+
+    //     // Compute overall status
+    //     $validated['status'] = $this->computeOverallStatus(
+    //         $validated['weight_for_age'],
+    //         $validated['height_for_age'],
+    //         $validated['weight_for_ltht_status']
+    //     );
+
+    //     $patient = Patient::create($validated);
+
+    //     return response()->json($patient, 201);
+    // }
+
+
+    // public function update(Request $request, $id)
+    // {
+    //     $patient = Patient::findOrFail($id);
+
+    //     $validated = $request->validate([
+    //         'name' => 'sometimes|string',
+    //         'address' => 'sometimes|string',
+    //         'belongs_to_ip' => 'sometimes|string',
+    //         'sex' => 'sometimes|string|in:Male,Female',
+    //         'birthday' => 'sometimes|date',
+    //         'date_measured' => 'sometimes|date',
+    //         'weight' => 'sometimes|integer',
+    //         'height' => 'sometimes|integer',
+    //         'contact_number' => 'sometimes|string',
+
+    //         'immunizations' => 'nullable|sometimes|string',
+    //         'last_deworming_date' => 'nullable|date',
+    //         'allergies' => 'nullable|string',
+    //         'medical_history' => 'nullable|string',
+    //         'notes' => 'nullable|sometimes|string',
+    //     ]);
+
+    //     // Recompute age if needed
+    //     if (isset($validated['birthday']) || isset($validated['date_measured'])) {
+    //         $birthday = $validated['birthday'] ?? $patient->birthday;
+    //         $date_measured = $validated['date_measured'] ?? $patient->date_measured;
+    //         $validated['age'] = Carbon::parse($birthday)
+    //             ->diffInYears(Carbon::parse($date_measured));
+    //     }
+
+    //     // Recompute nutrition + status if weight/height changed
+    //     if (isset($validated['weight']) || isset($validated['height'])) {
+    //         $settings = Setting::firstOrFail();
+    //         $weight = $validated['weight'] ?? $patient->weight;
+    //         $height = $validated['height'] ?? $patient->height;
+
+    //         $wfa = $this->computeWFA($weight, $settings);
+    //         $hfa = $this->computeHFA($height, $settings);
+    //         $wfs = $this->computeWFS($weight, $settings);
+
+    //         $validated['weight_for_age'] = $wfa;
+    //         $validated['height_for_age'] = $hfa;
+    //         $validated['weight_for_ltht_status'] = $wfs;
+
+    //         $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
+    //     }
+
+    //     $patient->update($validated);
+
+    //     return response()->json($patient);
+    // }
+
+    
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -101,8 +205,8 @@ class PatientController extends Controller
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
             'date_measured' => 'required|date',
-            'weight' => 'required|integer',
-            'height' => 'required|integer',
+            'weight' => 'required|numeric',
+            'height' => 'required|numeric',
             'contact_number' => 'required|string',
 
             'immunizations' => 'nullable|string',
@@ -112,19 +216,19 @@ class PatientController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        // Calculate age
+        // Age in years
         $validated['age'] = Carbon::parse($validated['birthday'])
             ->diffInYears(Carbon::parse($validated['date_measured']));
 
-        // Fetch thresholds
-        $settings = Setting::firstOrFail();
+        // Compute BMI
+        $bmi = $validated['weight'] / pow($validated['height'] / 100, 2);
 
-        // Compute nutritional status
-        $validated['weight_for_age'] = $this->computeWFA($validated['weight'], $settings);
-        $validated['height_for_age'] = $this->computeHFA($validated['height'], $settings);
-        $validated['weight_for_ltht_status'] = $this->computeWFS($validated['weight'], $settings);
+        // Compute nutrition
+        $validated['weight_for_age'] = $this->computeWFA($validated['age'], $validated['weight']);
+        $validated['height_for_age'] = $this->computeHFA($validated['age'], $validated['height']);
+        $validated['weight_for_ltht_status'] = $this->computeWFHOrBMI($validated['age'], $bmi);
 
-        // Compute overall status
+        // Overall status
         $validated['status'] = $this->computeOverallStatus(
             $validated['weight_for_age'],
             $validated['height_for_age'],
@@ -134,12 +238,6 @@ class PatientController extends Controller
         $patient = Patient::create($validated);
 
         return response()->json($patient, 201);
-    }
-
-    public function show($id){
-        $patient = Patient::findOrFail($id);
-
-        return response()->json($patient);
     }
 
     public function update(Request $request, $id)
@@ -153,8 +251,8 @@ class PatientController extends Controller
             'sex' => 'sometimes|string|in:Male,Female',
             'birthday' => 'sometimes|date',
             'date_measured' => 'sometimes|date',
-            'weight' => 'sometimes|integer',
-            'height' => 'sometimes|integer',
+            'weight' => 'sometimes|numeric',
+            'height' => 'sometimes|numeric',
             'contact_number' => 'sometimes|string',
 
             'immunizations' => 'nullable|sometimes|string',
@@ -164,7 +262,7 @@ class PatientController extends Controller
             'notes' => 'nullable|sometimes|string',
         ]);
 
-        // Recompute age if needed
+        // Recompute age if birthday or measured date changed
         if (isset($validated['birthday']) || isset($validated['date_measured'])) {
             $birthday = $validated['birthday'] ?? $patient->birthday;
             $date_measured = $validated['date_measured'] ?? $patient->date_measured;
@@ -172,72 +270,80 @@ class PatientController extends Controller
                 ->diffInYears(Carbon::parse($date_measured));
         }
 
-        // Recompute nutrition + status if weight/height changed
-        if (isset($validated['weight']) || isset($validated['height'])) {
-            $settings = Setting::firstOrFail();
-            $weight = $validated['weight'] ?? $patient->weight;
-            $height = $validated['height'] ?? $patient->height;
+        // Recompute nutrition if weight/height updated
+        $weight = $validated['weight'] ?? $patient->weight;
+        $height = $validated['height'] ?? $patient->height;
+        $age = $validated['age'] ?? $patient->age;
 
-            $wfa = $this->computeWFA($weight, $settings);
-            $hfa = $this->computeHFA($height, $settings);
-            $wfs = $this->computeWFS($weight, $settings);
+        $bmi = $weight / pow($height / 100, 2);
 
-            $validated['weight_for_age'] = $wfa;
-            $validated['height_for_age'] = $hfa;
-            $validated['weight_for_ltht_status'] = $wfs;
+        $wfa = $this->computeWFA($age, $weight);
+        $hfa = $this->computeHFA($age, $height);
+        $wfs = $this->computeWFHOrBMI($age, $bmi);
 
-            $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
-        }
+        $validated['weight_for_age'] = $wfa;
+        $validated['height_for_age'] = $hfa;
+        $validated['weight_for_ltht_status'] = $wfs;
+        $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
 
         $patient->update($validated);
 
         return response()->json($patient);
     }
 
-    private function computeWFA($weight, $settings)
+    private function computeWFA($age, $weight)
     {
-        if ($weight <= $settings->wfa_underweight) return 'Underweight';
-        if ($weight <= $settings->wfa_normal) return 'Normal';
-        return 'Overweight';
+        // Simplified thresholds (not real WHO Z-scores)
+        if ($age < 5 && $weight < 10) return 'Underweight';
+        if ($age < 10 && $weight < 20) return 'Underweight';
+        if ($age >= 10 && $weight < 40) return 'Underweight';
+
+        if ($weight > 80) return 'Overweight';
+
+        return 'Normal';
     }
 
-    private function computeHFA($height, $settings)
+    private function computeHFA($age, $height)
     {
-        if ($height <= $settings->hfa_stunted) return 'Stunted';
-        if ($height <= $settings->hfa_normal) return 'Normal';
-        return 'Tall';
+        if ($age < 5 && $height < 85) return 'Stunted';
+        if ($age < 10 && $height < 120) return 'Stunted';
+        if ($age >= 10 && $height < 150) return 'Stunted';
+
+        if ($height > 190) return 'Tall';
+
+        return 'Normal';
     }
 
-    private function computeWFS($weight, $settings)
+    private function computeWFHOrBMI($age, $bmi)
     {
-        if ($weight <= $settings->wfs_wasted) return 'Wasted';
-        if ($weight <= $settings->wfs_normal) return 'Normal';
-        return 'Obese';
+        if ($age < 20) {
+            if ($bmi < 14) return 'Wasted';
+            if ($bmi > 21) return 'Obese';
+            return 'Normal';
+        } else {
+            if ($bmi < 18.5) return 'Wasted';
+            if ($bmi >= 30) return 'Obese';
+            return 'Normal';
+        }
     }
 
-    /**
-     * Compute overall patient status color.
-     */
     private function computeOverallStatus($wfa, $hfa, $wfs)
     {
-        // Severe red cases
-        if (in_array('Wasted', [$wfs]) || in_array('Stunted', [$hfa])) {
+        if ($wfs === 'Wasted' || $hfa === 'Stunted') {
             return 'Severe';
         }
 
-        // Moderate orange cases
         if ($wfa === 'Underweight' || $wfa === 'Overweight' || $wfs === 'Obese') {
             return 'Moderate';
         }
 
-        // At risk yellow
         if ($hfa === 'Tall') {
             return 'At Risk';
         }
 
-        // Healthy
         return 'Healthy';
     }
+
 
     public function delete(Request $request)
     {

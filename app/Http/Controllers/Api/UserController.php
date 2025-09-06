@@ -42,7 +42,7 @@ class UserController extends Controller
             }
         }
 
-        $users = $query->where("role", "bhw")->orderBy('id', 'desc')->paginate($perPage);
+        $users = $query->where("role", "bns")->orderBy('id', 'desc')->paginate($perPage);
 
         $roleCounts = [
             'total'      => User::count(),
@@ -62,7 +62,6 @@ class UserController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'contact_number' => ['required', 'string', 'max:11', 'min:11'],
-            'hw_id' => ['required', 'string', 'max:255'],
             'area' => ['required', 'string', 'max:255'],
             'notes' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
@@ -72,7 +71,6 @@ class UserController extends Controller
         $user = User::create([
             'name' => $request->name,
             'contact_number' => $request->contact_number,
-            'hw_id' => $request->hw_id,
             'area' => $request->area,
             'notes' => $request->notes,
             'password' => Hash::make(1234),
