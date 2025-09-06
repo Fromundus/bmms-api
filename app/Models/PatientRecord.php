@@ -4,16 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Patient extends Model
+class PatientRecord extends Model
 {
     protected $fillable = [
-        "name",
-        "address",
-        "belongs_to_ip",
-        "sex",
-        "birthday",
-        "contact_number",
-
+        "patient_id",
         "date_measured",
         "weight",
         "height",
@@ -31,13 +25,7 @@ class Patient extends Model
         "status",
     ];
 
-    public function records(){
-        return $this->hasMany(PatientRecord::class);
+    public function patient(){
+        return $this->belongsTo(Patient::class);
     }
-
-    public function latestRecord()
-    {
-        return $this->hasOne(PatientRecord::class)->latestOfMany('date_measured');
-    }
-
 }

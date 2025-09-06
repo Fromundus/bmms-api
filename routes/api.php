@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\RegisteredMemberController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\UserController;
 use App\Models\Patient;
+use App\Models\PatientRecord;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -40,7 +41,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
             Route::get('/', [PatientController::class, 'index']);
             Route::post('/', [PatientController::class, 'store']);
             Route::get('/{id}', [PatientController::class, 'show']);
-            Route::put('/{id}', [PatientController::class, 'update']);
+            Route::put('/{id}', [PatientController::class, 'updateOrAddRecords']);
+            Route::put('/updateinfo/{id}', [PatientController::class, 'updateInformation']);
             Route::delete('/', [PatientController::class, 'delete']);
         });
 
@@ -63,6 +65,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
 });
 
 Route::post('/login', [AuthController::class, 'login']);
+
+Route::get('/getlatestrecord', function(){
+    $r = PatientRecord::where("patient_id", 2)->latest("id")->first();
+
+    return response()->json(["data" => $r]);
+});
 
 Route::get('/test', function(){
     return response()->json([

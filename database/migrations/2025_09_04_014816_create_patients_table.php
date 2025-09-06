@@ -18,22 +18,23 @@ return new class extends Migration
             $table->string("belongs_to_ip");
             $table->string("sex");
             $table->date("birthday");
-            $table->date("date_measured");
-            $table->integer("weight");
-            $table->integer("height");
-            $table->integer("age");
-            $table->string("weight_for_age"); //underweight //normal //overweight
-            $table->string("height_for_age"); //stunted //normal //tall
-            $table->string("weight_for_ltht_status"); //wasted //normal //obese
             $table->string("contact_number");
-
-            $table->text("immunizations")->nullable();
-            $table->date("last_deworming_date")->nullable();
-            $table->string("allergies")->nullable();
-            $table->text("medical_history")->nullable();
-            $table->text("notes")->nullable();
             
-            $table->string("status")->nullable();
+            // $table->date("date_measured");
+            // $table->integer("weight");
+            // $table->integer("height");
+            // $table->integer("age");
+            // $table->string("weight_for_age"); //underweight //normal //overweight
+            // $table->string("height_for_age"); //stunted //normal //tall
+            // $table->string("weight_for_ltht_status"); //wasted //normal //obese
+
+            // $table->text("immunizations")->nullable();
+            // $table->date("last_deworming_date")->nullable();
+            // $table->string("allergies")->nullable();
+            // $table->text("medical_history")->nullable();
+            // $table->text("notes")->nullable();
+            
+            // $table->string("status")->nullable();
 
             $table->timestamps();
         });

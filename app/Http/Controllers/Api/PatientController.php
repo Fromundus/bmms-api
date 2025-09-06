@@ -4,29 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
+use App\Models\PatientRecord;
 use App\Models\Setting;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class PatientController extends Controller
 {
-    // public function getStats(){
-    //     $totalPatients = Patient::count();
-
-    //     $severe = Patient::where("status", "Severe")->count();
-    //     $moderate = Patient::where("status", "Moderate")->count();
-    //     $atRisk = Patient::where("status", "At Risk")->count();
-    //     $healthy = Patient::where("status", "Healthy")->count();
-
-    //     return response()->json([
-    //         'total_patients' => $totalPatients,
-    //         'severe' => $severe,
-    //         'moderate' => $moderate,
-    //         'at_risk' => $atRisk,
-    //         'healthy' => $healthy,
-    //     ]);
-    // }
-
     public function getStats()
     {
         $totalPatients = Patient::count();
@@ -72,7 +56,7 @@ class PatientController extends Controller
         $search = $request->query('search');
         $perPage = $request->query('per_page', 10);
 
-        $query = Patient::query();
+        $query = Patient::query()->with("latestRecord");
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -93,108 +77,10 @@ class PatientController extends Controller
     }
 
     public function show($id){
-        $patient = Patient::findOrFail($id);
+        $patient = Patient::with("latestRecord")->findOrFail($id);
 
         return response()->json($patient);
     }
-
-    // public function store(Request $request)
-    // {
-    //     $validated = $request->validate([
-    //         'name' => 'required|string',
-    //         'address' => 'required|string',
-    //         'belongs_to_ip' => 'required|string',
-    //         'sex' => 'required|string|in:Male,Female',
-    //         'birthday' => 'required|date',
-    //         'date_measured' => 'required|date',
-    //         'weight' => 'required|integer',
-    //         'height' => 'required|integer',
-    //         'contact_number' => 'required|string',
-
-    //         'immunizations' => 'nullable|string',
-    //         'last_deworming_date' => 'nullable|date',
-    //         'allergies' => 'nullable|string',
-    //         'medical_history' => 'nullable|string',
-    //         'notes' => 'nullable|string',
-    //     ]);
-
-    //     // Calculate age
-    //     $validated['age'] = Carbon::parse($validated['birthday'])
-    //         ->diffInYears(Carbon::parse($validated['date_measured']));
-
-    //     // Fetch thresholds
-    //     $settings = Setting::firstOrFail();
-
-    //     // Compute nutritional status
-    //     $validated['weight_for_age'] = $this->computeWFA($validated['weight'], $settings);
-    //     $validated['height_for_age'] = $this->computeHFA($validated['height'], $settings);
-    //     $validated['weight_for_ltht_status'] = $this->computeWFS($validated['weight'], $settings);
-
-    //     // Compute overall status
-    //     $validated['status'] = $this->computeOverallStatus(
-    //         $validated['weight_for_age'],
-    //         $validated['height_for_age'],
-    //         $validated['weight_for_ltht_status']
-    //     );
-
-    //     $patient = Patient::create($validated);
-
-    //     return response()->json($patient, 201);
-    // }
-
-
-    // public function update(Request $request, $id)
-    // {
-    //     $patient = Patient::findOrFail($id);
-
-    //     $validated = $request->validate([
-    //         'name' => 'sometimes|string',
-    //         'address' => 'sometimes|string',
-    //         'belongs_to_ip' => 'sometimes|string',
-    //         'sex' => 'sometimes|string|in:Male,Female',
-    //         'birthday' => 'sometimes|date',
-    //         'date_measured' => 'sometimes|date',
-    //         'weight' => 'sometimes|integer',
-    //         'height' => 'sometimes|integer',
-    //         'contact_number' => 'sometimes|string',
-
-    //         'immunizations' => 'nullable|sometimes|string',
-    //         'last_deworming_date' => 'nullable|date',
-    //         'allergies' => 'nullable|string',
-    //         'medical_history' => 'nullable|string',
-    //         'notes' => 'nullable|sometimes|string',
-    //     ]);
-
-    //     // Recompute age if needed
-    //     if (isset($validated['birthday']) || isset($validated['date_measured'])) {
-    //         $birthday = $validated['birthday'] ?? $patient->birthday;
-    //         $date_measured = $validated['date_measured'] ?? $patient->date_measured;
-    //         $validated['age'] = Carbon::parse($birthday)
-    //             ->diffInYears(Carbon::parse($date_measured));
-    //     }
-
-    //     // Recompute nutrition + status if weight/height changed
-    //     if (isset($validated['weight']) || isset($validated['height'])) {
-    //         $settings = Setting::firstOrFail();
-    //         $weight = $validated['weight'] ?? $patient->weight;
-    //         $height = $validated['height'] ?? $patient->height;
-
-    //         $wfa = $this->computeWFA($weight, $settings);
-    //         $hfa = $this->computeHFA($height, $settings);
-    //         $wfs = $this->computeWFS($weight, $settings);
-
-    //         $validated['weight_for_age'] = $wfa;
-    //         $validated['height_for_age'] = $hfa;
-    //         $validated['weight_for_ltht_status'] = $wfs;
-
-    //         $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
-    //     }
-
-    //     $patient->update($validated);
-
-    //     return response()->json($patient);
-    // }
-
     
     public function store(Request $request)
     {
@@ -204,10 +90,11 @@ class PatientController extends Controller
             'belongs_to_ip' => 'required|string',
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
+            'contact_number' => 'required|string',
+
             'date_measured' => 'required|date',
             'weight' => 'required|numeric',
             'height' => 'required|numeric',
-            'contact_number' => 'required|string',
 
             'immunizations' => 'nullable|string',
             'last_deworming_date' => 'nullable|date',
@@ -235,31 +122,131 @@ class PatientController extends Controller
             $validated['weight_for_ltht_status']
         );
 
-        $patient = Patient::create($validated);
+        $patient = Patient::create(attributes: [
+            'name' => $validated["name"],
+            'address' => $validated["address"],
+            'belongs_to_ip' => $validated["belongs_to_ip"],
+            'sex' => $validated["sex"],
+            'birthday' => $validated["birthday"],
+            'contact_number' => $validated["contact_number"],
+        ]);
+
+        if($patient){
+            PatientRecord::create([
+                'patient_id' => $patient->id,
+                'date_measured' => $validated["date_measured"],
+                'weight' => $validated["weight"],
+                'height' => $validated["height"],
+                'age' => $validated["age"],
+                "weight_for_age" => $validated["weight_for_age"],
+                "height_for_age" => $validated["height_for_age"],
+                "weight_for_ltht_status" => $validated["weight_for_ltht_status"],
+                
+                'immunizations' => $validated["immunizations"],
+                'last_deworming_date' => $validated["last_deworming_date"],
+                'allergies' => $validated["allergies"],
+                'medical_history' => $validated["medical_history"],
+                'notes' => $validated["notes"],
+                'status' => $validated["status"],
+            ]);
+        }
 
         return response()->json($patient, 201);
     }
 
-    public function update(Request $request, $id)
+    public function updateInformation(Request $request, $id)
+    {
+        $patient = Patient::with("latestRecord")->findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'address' => 'required|string',
+            'belongs_to_ip' => 'required|string',
+            'sex' => 'required|string|in:Male,Female',
+            'birthday' => 'required|date',
+            'contact_number' => 'required|string',
+        ]);
+
+        // Recompute age if birthday or measured date changed
+        if (isset($validated['birthday']) || isset($validated['date_measured'])) {
+            $birthday = $validated['birthday'] ?? $patient->birthday;
+            $date_measured = $validated['date_measured'] ?? $patient->latestRecord->date_measured;
+            $validated['age'] = Carbon::parse($birthday)
+                ->diffInYears(Carbon::parse($date_measured));
+        }
+
+        // Recompute nutrition if weight/height updated
+        $weight = $validated['weight'] ?? $patient->latestRecord->weight;
+        $height = $validated['height'] ?? $patient->latestRecord->height;
+        $age = $validated['age'] ?? $patient->latestRecord->age;
+
+        $bmi = $weight / pow($height / 100, 2);
+
+        $wfa = $this->computeWFA($age, $weight);
+        $hfa = $this->computeHFA($age, $height);
+        $wfs = $this->computeWFHOrBMI($age, $bmi);
+
+        $validated['weight_for_age'] = $wfa;
+        $validated['height_for_age'] = $hfa;
+        $validated['weight_for_ltht_status'] = $wfs;
+        $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
+
+        $patient->update([
+            'name' => $validated["name"],
+            'address' => $validated["address"],
+            'belongs_to_ip' => $validated["belongs_to_ip"],
+            'sex' => $validated["sex"],
+            'birthday' => $validated["birthday"],
+            'contact_number' => $validated["contact_number"],
+        ]);
+
+        $latestRecord = PatientRecord::where("patient_id", $patient->id)->latest("id")->first();
+
+        if($patient){
+            $latestRecord->update([
+                // 'patient_id' => $patient->id,
+                // 'date_measured' => $validated["date_measured"],
+                // 'weight' => $validated["weight"],
+                // 'height' => $validated["height"],
+                'age' => $validated["age"],
+                // "weight_for_age" => $validated["weight_for_age"],
+                // "height_for_age" => $validated["height_for_age"],
+                // "weight_for_ltht_status" => $validated["weight_for_ltht_status"],
+                
+                // 'immunizations' => $validated["immunizations"],
+                // 'last_deworming_date' => $validated["last_deworming_date"],
+                // 'allergies' => $validated["allergies"],
+                // 'medical_history' => $validated["medical_history"],
+                // 'notes' => $validated["notes"],
+                // 'status' => $validated["status"],
+            ]);
+        }
+
+        return response()->json($patient);
+    }
+
+    //THIS IS FOR ADDING NEW RECORDS
+    public function updateOrAddRecords(Request $request, $id)
     {
         $patient = Patient::findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'sometimes|string',
-            'address' => 'sometimes|string',
-            'belongs_to_ip' => 'sometimes|string',
-            'sex' => 'sometimes|string|in:Male,Female',
-            'birthday' => 'sometimes|date',
-            'date_measured' => 'sometimes|date',
-            'weight' => 'sometimes|numeric',
-            'height' => 'sometimes|numeric',
-            'contact_number' => 'sometimes|string',
+            // 'name' => 'required|string',
+            // 'address' => 'required|string',
+            // 'belongs_to_ip' => 'required|string',
+            // 'sex' => 'required|string|in:Male,Female',
+            'birthday' => 'required|date',
+            // 'contact_number' => 'required|string',
 
-            'immunizations' => 'nullable|sometimes|string',
+            'date_measured' => 'required|date',
+            'weight' => 'required|numeric',
+            'height' => 'required|numeric',
+
+            'immunizations' => 'nullable|string',
             'last_deworming_date' => 'nullable|date',
             'allergies' => 'nullable|string',
             'medical_history' => 'nullable|string',
-            'notes' => 'nullable|sometimes|string',
+            'notes' => 'nullable|string',
         ]);
 
         // Recompute age if birthday or measured date changed
@@ -286,7 +273,34 @@ class PatientController extends Controller
         $validated['weight_for_ltht_status'] = $wfs;
         $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
 
-        $patient->update($validated);
+        // $patient->update([
+        //     'name' => $validated["name"],
+        //     'address' => $validated["address"],
+        //     'belongs_to_ip' => $validated["belongs_to_ip"],
+        //     'sex' => $validated["sex"],
+        //     'birthday' => $validated["birthday"],
+        //     'contact_number' => $validated["contact_number"],
+        // ]);
+
+        if($patient){
+            PatientRecord::create([
+                'patient_id' => $patient->id,
+                'date_measured' => $validated["date_measured"],
+                'weight' => $validated["weight"],
+                'height' => $validated["height"],
+                'age' => $validated["age"],
+                "weight_for_age" => $validated["weight_for_age"],
+                "height_for_age" => $validated["height_for_age"],
+                "weight_for_ltht_status" => $validated["weight_for_ltht_status"],
+                
+                'immunizations' => $validated["immunizations"],
+                'last_deworming_date' => $validated["last_deworming_date"],
+                'allergies' => $validated["allergies"],
+                'medical_history' => $validated["medical_history"],
+                'notes' => $validated["notes"],
+                'status' => $validated["status"],
+            ]);
+        }
 
         return response()->json($patient);
     }
