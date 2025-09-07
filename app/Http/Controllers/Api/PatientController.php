@@ -53,11 +53,40 @@ class PatientController extends Controller
         $search = $request->query('search');
         $perPage = $request->query('per_page', 10);
 
+        $wfa = $request->query('wfa');
+        $hfa = $request->query('hfa');
+        $wfltht = $request->query('wfltht');
+        $status = $request->query('status');
+
         $query = Patient::query()->with("latestRecord");
 
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%");
+            });
+        }
+
+        if($wfa && $wfa !== 'all'){
+            $query->whereHas("latestRecord", function($q) use ($wfa){
+                $q->where("weight_for_age", $wfa);
+            });
+        }
+
+        if($hfa && $hfa !== 'all'){
+            $query->whereHas("latestRecord", function($q) use ($hfa){
+                $q->where("height_for_age", $hfa);
+            });
+        }
+
+        if($wfltht && $wfltht !== 'all'){
+            $query->whereHas("latestRecord", function($q) use ($wfltht){
+                $q->where("weight_for_ltht_status", $wfltht);
+            });
+        }
+
+        if($status && $status !== 'all'){
+            $query->whereHas("latestRecord", function($q) use ($status){
+                $q->where("status", $status);
             });
         }
 
