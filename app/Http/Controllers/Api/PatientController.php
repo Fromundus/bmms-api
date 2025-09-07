@@ -78,6 +78,12 @@ class PatientController extends Controller
 
         return response()->json($patient);
     }
+
+    public function history($id){
+        $patient = Patient::with("records")->findOrFail($id);
+
+        return response()->json($patient);
+    }
     
     public function store(Request $request)
     {

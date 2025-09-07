@@ -32,7 +32,7 @@ class Patient extends Model
     ];
 
     public function records(){
-        return $this->hasMany(PatientRecord::class);
+        return $this->hasMany(PatientRecord::class)->latest("id");
     }
 
     public function latestRecord()

@@ -43,6 +43,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
             Route::get('/', [PatientController::class, 'index']);
             Route::post('/', [PatientController::class, 'store']);
             Route::get('/{id}', [PatientController::class, 'show']);
+            Route::get('/history/{id}', [PatientController::class, 'history']);
             Route::put('/{id}', [PatientController::class, 'updateOrAddRecords']);
             Route::put('/updateinfo/{id}', [PatientController::class, 'updateInformation']);
             Route::delete('/', [PatientController::class, 'delete']);
