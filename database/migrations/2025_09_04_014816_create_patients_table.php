@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string("name");
             $table->string("address");
-            $table->string("belongs_to_ip");
             $table->string("sex");
             $table->date("birthday");
             $table->string("contact_number");

@@ -17,6 +17,16 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
         User::factory()->create([
+            'name' => 'Admin',
+            'contact_number' => '11111111111',
+            'email' => 'admin@test.com',
+            'area' => '',
+            'notes' => '',
+            'password' => Hash::make("1234"),
+            'role' => 'admin',
+        ]);
+
+        User::factory()->create([
             'name' => 'Barangay Nutrition Scholar',
             'contact_number' => '09123456789',
             'email' => 'bns@test.com',
@@ -33,7 +43,7 @@ class DatabaseSeeder extends Seeder
             'area' => 'Purok 1',
             'notes' => 'lorem ipsum',
             'password' => Hash::make("1234"),
-            'role' => 'admin',
+            'role' => 'bhw',
         ]);
     }
 }

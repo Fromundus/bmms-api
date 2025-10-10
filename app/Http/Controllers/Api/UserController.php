@@ -42,18 +42,19 @@ class UserController extends Controller
             }
         }
 
-        $users = $query->where("role", "bns")->orderBy('id', 'desc')->paginate($perPage);
+        $users = null;
 
-        $roleCounts = [
-            'total'      => User::count(),
-            'superadmin' => User::where('role', 'superadmin')->count(),
-            'admin'      => User::where('role', 'admin')->count(),
-            'driver'       => User::where('role', 'driver')->count(),
-        ];
+        $auth = $request->user();
+
+        if($auth->role == "admin"){
+            $users = $query->where("role", "bns")->orWhere("role", 'bhw')->orderBy('id', 'desc')->paginate($perPage);
+        } else if ($auth->role == "bhw"){
+            $users = $query->where("role", "bns")->orderBy('id', 'desc')->paginate($perPage);
+        }
+
 
         return response()->json([
             'users' => $users,
-            'counts' => $roleCounts,
         ]);
     }
 
@@ -117,10 +118,6 @@ class UserController extends Controller
             ->update(['status' => $validated['status']]);
 
         $users = User::whereIn('id', $validated['ids'])->get();
-
-        // foreach($users as $user){            
-        //     ActivityLogger::log('update', 'account', "Updated account: #" . $user->id . " " . $user->name . " (changed role to " . $request->role . ")");
-        // }
 
         return response()->json(['message' => 'Status updated successfully']);
     }

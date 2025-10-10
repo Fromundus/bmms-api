@@ -14,20 +14,22 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string|unique:users',
-            'fullname' => 'required|string',
-            // 'email' => 'required|email|unique:users',
-            // 'password' => 'required|confirmed|string|min:6',
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users,email',
+            'contact_number' => 'required|string|unique:users,contact_number|min:11|max:11',
+            'area' => 'required|string|max:255',
+            'password' => 'required|confirmed|string|min:6',
             'role' => 'required|string',
         ]);
 
         $user = User::create([
-            'name' => $data['name'],
-            // 'email' => $data['email'],
-            'fullname' => $data['fullname'],
-            'role' => $data['role'],
-            'password' => Hash::make(123456),
-            // 'status' => 'active',
+            'name' => $data["name"],
+            'email' => $data["email"],
+            'contact_number' => $data["contact_number"],
+            'area' => $data["area"],
+            'password' => Hash::make($data["password"]),
+            'role' => $data["role"],
+            'status' => 'pending',
         ]);
 
         return response()->json($user, 201);
@@ -49,9 +51,15 @@ class AuthController extends Controller
         }
 
         if($user && $user->status !== "active"){
-            throw ValidationException::withMessages([
-                'name' => ['Inactive Account.'],
-            ]);
+            if($user->status == "pending"){
+                throw ValidationException::withMessages([
+                    'name' => ['We are reviewing your account. Try again later.'],
+                ]);
+            } else {
+                throw ValidationException::withMessages([
+                    'name' => ['Invalid Account.'],
+                ]);
+            }
         }
 
         $token = $user->createToken('api_token')->plainTextToken;

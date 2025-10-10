@@ -28,6 +28,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
         // Route::post('/account', [AuthController::class, 'register']);
         // Route::post('/account/batch-delete', [UserController::class, 'batchDelete']);
         // Route::post('/account/batch-update', [UserController::class, 'batchUpdateStatus']);
+
+        Route::put('/update-status', [UserController::class, 'updateStatus']);
         
         Route::prefix('/users')->group(function(){
             Route::get('/', [UserController::class, 'index']);
@@ -61,6 +63,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
 Route::get('/notifications', [NotificationController::class, 'index']);
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
 
 Route::get('/test', function(){
     return response()->json([
