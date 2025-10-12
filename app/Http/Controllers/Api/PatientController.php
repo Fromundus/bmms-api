@@ -8,6 +8,7 @@ use App\Models\PatientRecord;
 use App\Models\Setting;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class PatientController extends Controller
 {
@@ -132,6 +133,8 @@ class PatientController extends Controller
             'allergies' => 'nullable|string',
             'medical_history' => 'nullable|string',
             'notes' => 'nullable|string',
+
+            'questionnaire_data' => 'nullable|array',
         ]);
 
         // Age in years
@@ -152,6 +155,11 @@ class PatientController extends Controller
             $validated['height_for_age'],
             $validated['weight_for_ltht_status']
         );
+
+        $questionnaire = $validated['questionnaire_data'] ?? [];
+        $likelyCause = $this->analyzeMalnutritionCause($validated['status'], $questionnaire);
+
+        Log::info($questionnaire);
 
         $patient = Patient::create(attributes: [
             'name' => $validated["name"],
@@ -178,6 +186,9 @@ class PatientController extends Controller
                 'medical_history' => $validated["medical_history"],
                 'notes' => $validated["notes"],
                 'status' => $validated["status"],
+
+                'likely_cause' => implode(',', $likelyCause),
+                'questionnaire_data' => $validated['questionnaire_data'],
             ]);
         }
 
@@ -275,6 +286,7 @@ class PatientController extends Controller
             'allergies' => 'nullable|string',
             'medical_history' => 'nullable|string',
             'notes' => 'nullable|string',
+            'questionnaire_data' => 'nullable|array',
         ]);
 
         // Recompute age if birthday or measured date changed
@@ -300,6 +312,11 @@ class PatientController extends Controller
         $validated['height_for_age'] = $hfa;
         $validated['weight_for_ltht_status'] = $wfs;
         $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
+
+        $questionnaire = $validated['questionnaire_data'] ?? [];
+        $likelyCause = $this->analyzeMalnutritionCause($validated['status'], $questionnaire);
+
+        Log::info($questionnaire);
 
         // $patient->update([
         //     'name' => $validated["name"],
@@ -327,6 +344,9 @@ class PatientController extends Controller
                 'medical_history' => $validated["medical_history"],
                 'notes' => $validated["notes"],
                 'status' => $validated["status"],
+
+                'likely_cause' => implode(',', $likelyCause),
+                'questionnaire_data' => $validated['questionnaire_data'],
             ]);
         }
 
@@ -482,6 +502,44 @@ class PatientController extends Controller
         return $status;
     }
 
+    private function analyzeMalnutritionCause(string $overallStatus, array $answers): array
+    {
+        $causes = [];
+
+        // Only analyze if status is not Healthy
+        if ($overallStatus !== 'Healthy') {
+
+            // --- For undernutrition cases (Severe or Moderate) ---
+            if (in_array($overallStatus, ['Severe', 'Moderate'])) {
+                if (!empty($answers['lowIncome']))
+                    $causes[] = 'Low household income / food insecurity';
+                if (empty($answers['eats3Meals']))
+                    $causes[] = 'Inadequate food intake or skipped meals';
+                if (empty($answers['eatsVegetables']))
+                    $causes[] = 'Poor diet quality (low fruits/vegetables)';
+                if (!empty($answers['recentIllness']))
+                    $causes[] = 'Frequent illness or infection';
+                if (empty($answers['cleanWater']))
+                    $causes[] = 'Unsafe water or poor sanitation';
+                if (isset($answers['breastfeeding']) && !$answers['breastfeeding'])
+                    $causes[] = 'Lack of breastfeeding for infant';
+            }
+
+            // --- For overweight / obesity cases ---
+            if (in_array($overallStatus, ['At Risk', 'Severe'])) {
+                if (!empty($answers['eats3Meals']) && empty($answers['eatsVegetables']))
+                    $causes[] = 'High calorie intake with poor diet balance';
+                if (empty($answers['recentIllness']) && empty($answers['lowIncome']))
+                    $causes[] = 'Possible sedentary lifestyle or overeating';
+            }
+        }
+
+        if (empty($causes)) {
+            $causes[] = 'No significant cause detected based on questionnaire';
+        }
+
+        return $causes;
+    }
 
     public function delete(Request $request)
     {

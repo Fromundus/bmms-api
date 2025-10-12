@@ -30,6 +30,9 @@ return new class extends Migration
             
             $table->string("status")->nullable();
 
+            $table->text('likely_cause')->nullable();
+            $table->json('questionnaire_data')->nullable();
+
             $table->foreign("patient_id")->references("id")->on("patients")->onDelete("cascade");
             
             $table->timestamps();

@@ -21,8 +21,15 @@ class PatientRecord extends Model
         "allergies",
         "medical_history",
         "notes",
-
+        
         "status",
+
+        'likely_cause',
+        'questionnaire_data',
+    ];
+
+    protected $casts = [
+        'questionnaire_data' => 'array',
     ];
 
     public function patient(){
