@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -62,7 +63,16 @@ class AuthController extends Controller
             }
         }
 
+        
         $token = $user->createToken('api_token')->plainTextToken;
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => 'login',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->header('User-Agent'),
+            'logged_at' => now(),
+        ]);
 
         return response()->json([
             'access_token' => $token,
@@ -78,6 +88,14 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        ActivityLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'logout',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->header('User-Agent'),
+            'logged_at' => now(),
+        ]);
+        
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

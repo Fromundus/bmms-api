@@ -11,10 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('notifications', function (Blueprint $table) {
+        Schema::create('activity_logs', function (Blueprint $table) {
             $table->id();
-            $table->string('title');
-            $table->text('message')->nullable();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('action'); // e.g., "login", "logout"
+            $table->string('ip_address')->nullable();
+            $table->string('user_agent')->nullable();
+            $table->timestamp('logged_at');
             $table->timestamps();
         });
     }
@@ -24,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('notifications');
+        Schema::dropIfExists('activity_logs');
     }
 };

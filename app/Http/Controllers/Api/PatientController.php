@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Notification;
 use App\Models\Patient;
 use App\Models\PatientRecord;
 use App\Models\Setting;
+use App\Services\SMSService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -115,14 +117,14 @@ class PatientController extends Controller
         return response()->json($patient);
     }
     
-    public function store(Request $request)
+    public function store(Request $request, SMSService $smsservice)
     {
         $validated = $request->validate([
             'name' => 'required|string',
             'address' => 'required|string',
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
-            'contact_number' => 'required|string',
+            'contact_number' => 'required|string|min:11|max:11',
 
             'date_measured' => 'required|date',
             'weight' => 'required|numeric',
@@ -190,12 +192,40 @@ class PatientController extends Controller
                 'likely_cause' => implode(',', $likelyCause),
                 'questionnaire_data' => $validated['questionnaire_data'],
             ]);
+
+            /**
+             * ✅ Create Notification for Admins (Monitoring)
+             */
+            $status = ucfirst($validated['status']);
+            $causes = !empty($likelyCause)
+                ? implode(', ', $likelyCause)
+                : 'No likely causes identified';
+
+            // Build a clean human-readable message
+            $message = "A new patient record was added.\n\n"
+                . "👤 **Name:** {$patient->name}\n"
+                . "📊 **Status:** {$status}\n"
+                . "🩺 **Likely Cause(s):** {$causes}\n"
+                . "📅 **Measured on:** {$validated['date_measured']}";
+
+            Notification::create([
+                'title' => "New Patient Added ({$status})",
+                'message' => $message,
+            ]);
+
+            // $patientMessage = "Hi {$patient->name}, your nutrition record dated {$validated['date_measured']} was added. Status: {$validated['status']}. Please follow you health worker's advice.";
+
+            $patientMessage = "Hi {$patient->name}, your nutrition record dated {$validated['date_measured']} was added. Status: {$validated['status']}" 
+            . (!empty($causeList) ? ", cause(s): {$causeList}." : ".") 
+            . " Please follow your health worker's advice.";
+
+            $response = $smsservice->sendSms("{$patient->contact_number}", $patientMessage);
         }
 
-        return response()->json($patient, 201);
+        return response()->json(["data" => $patient, "response" => $response], 200);
     }
 
-    public function updateInformation(Request $request, $id)
+    public function updateInformation(Request $request, $id, SMSService $smsservice)
     {
         $patient = Patient::with("latestRecord")->findOrFail($id);
 
@@ -204,7 +234,7 @@ class PatientController extends Controller
             'address' => 'required|string',
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
-            'contact_number' => 'required|string',
+            'contact_number' => 'required|string|min:11|max:11',
         ]);
 
         // Recompute age if birthday or measured date changed
@@ -259,13 +289,40 @@ class PatientController extends Controller
                 // 'notes' => $validated["notes"],
                 // 'status' => $validated["status"],
             ]);
+
+            /**
+             * ✅ Create Notification for Admins (Monitoring)
+             */
+            $status = ucfirst($validated['status']);
+            $previousStatus = ucfirst($latestRecord->status ?? 'N/A');
+
+            // Build notification message
+            $message = "Patient information has been updated.\n\n"
+                . "👤 **Name:** {$patient->name}\n"
+                . "📊 **Previous Status:** {$previousStatus}\n"
+                . "📈 **Current Status:** {$status}\n"
+                . "📅 **Last Measured:** {$latestRecord->date_measured}\n"
+                . "Please review for follow-up or verification.";
+
+            Notification::create([
+                'title' => "Patient Record Updated ({$status})",
+                'message' => $message,
+            ]);
+
+            // $patientMessage = "Hi {$patient->name}, your nutrition record was updated. Prev: {$previousStatus}, Now: {$status}. Keep following your health worker's advice.";
+
+            $patientMessage = "Hi {$patient->name}, your nutrition record was updated. Prev: {$previousStatus}, Now: {$status}" 
+            . (!empty($causeList) ? ", cause(s): {$causeList}." : ".") 
+            . " Keep following your health worker's advice.";
+
+            $response = $smsservice->sendSms($patient->contact_number, $patientMessage);
         }
 
-        return response()->json($patient);
+        return response()->json(["data" => $patient, "response" => $response], 200);
     }
 
     //THIS IS FOR ADDING NEW RECORDS
-    public function updateOrAddRecords(Request $request, $id)
+    public function updateOrAddRecords(Request $request, $id, SMSService $smsservice)
     {
         $patient = Patient::with("latestRecord")->findOrFail($id);
 
@@ -348,9 +405,33 @@ class PatientController extends Controller
                 'likely_cause' => implode(',', $likelyCause),
                 'questionnaire_data' => $validated['questionnaire_data'],
             ]);
+
+            /**
+             * ✅ Create Notification for Admin Monitoring
+             */
+            $status = ucfirst($validated['status']);
+            $causeList = implode(', ', $likelyCause) ?: 'No likely cause identified';
+
+            $message = "A new record has been added for **{$patient->name}**.\n\n"
+                . "📅 **Date Measured:** {$validated['date_measured']}\n"
+                . "📊 **Nutritional Status:** {$status}\n"
+                . "🩺 **Possible Cause(s):** {$causeList}\n"
+                . "Please review for appropriate intervention or follow-up.";
+
+            Notification::create([
+                'title' => "New Patient Record ({$status})",
+                'message' => $message,
+            ]);
+
+            $patientMessage = "Hi {$patient->name}, your nutrition record ({$validated['date_measured']}) was added. Status: {$status}" 
+                . (!empty($causeList) ? ", cause(s): {$causeList}." : ".") 
+                . " Please follow your health worker's advice.";
+
+
+            $response = $smsservice->sendSms($patient->contact_number, $patientMessage);
         }
 
-        return response()->json($patient);
+        return response()->json(["data" => $patient, "response" => $response], 200);
     }
 
     // private function computeWFA($age, $weight)

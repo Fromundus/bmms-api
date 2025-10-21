@@ -9,12 +9,10 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    public function index(){
-        $notif = Notification::whereDate('created_at', Carbon::today())
-        ->latest()
-        ->take(2)
-        ->get();
+    public function index()
+    {
+        $notifications = Notification::latest()->get();
 
-        return response()->json(["data" => $notif]);
+        return response()->json($notifications);
     }
 }
