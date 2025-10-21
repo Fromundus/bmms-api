@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\RegisteredMemberController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\SMSMessageController;
 use App\Http\Controllers\Api\UserController;
 use App\Models\Patient;
 use App\Models\PatientRecord;
@@ -58,6 +59,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
         Route::get('/reports/patients/export/{type}', [ReportController::class, 'export']);
 
         Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+
+        Route::post('/send-schedule', [SMSMessageController::class, 'sendSchedule']);
     });
     
     //USER ACCOUNTS
