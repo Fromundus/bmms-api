@@ -486,42 +486,39 @@ class PatientController extends Controller
 
     private function computeWFA($age, $weight)
     {
-        // 🚫 WHO: Weight-for-Age NOT valid for ≥10 years
-        if ($age >= 10) {
-            return 'Not Applicable';
-        }
-
         if ($age < 5) {
             if ($weight < 10) return 'Severely Underweight';
             if ($weight < 14) return 'Underweight';
-        } else { // 5–9 years
+        } elseif ($age < 10) {
             if ($weight < 20) return 'Underweight';
             if ($weight < 25) return 'Mildly Underweight';
+        } elseif ($age < 20) {
+            if ($weight < 40) return 'Underweight';
+        } else {
+            // Adults: screening only
+            if ($weight < 40) return 'Underweight';
+            if ($weight > 100) return 'Overweight';
         }
 
         return 'Normal';
     }
 
-
     private function computeHFA($age, $height)
     {
-        // 🚫 WHO: Height-for-Age NOT valid for ≥20 years
-        if ($age >= 20) {
-            return 'Not Applicable';
-        }
-
         if ($age < 5) {
             if ($height < 85) return 'Severely Stunted';
             if ($height < 95) return 'Stunted';
         } elseif ($age < 10) {
             if ($height < 120) return 'Stunted';
-        } else { // 10–19 years
+        } elseif ($age < 20) {
             if ($height < 150) return 'Stunted';
+        } else {
+            // Adults: historical screening
+            if ($height < 145) return 'Stunted';
         }
 
         return 'Normal';
     }
-
 
     private function computeWFHOrBMI($age, $bmi)
     {
@@ -556,10 +553,11 @@ class PatientController extends Controller
             }
 
             if ($bmi >= 18.5 && $bmi < 20) {
-                return 'At Risk'; // Low-normal BMI
+                return 'At Risk';
             }
         }
 
+        // --- Severe growth indicators ---
         if (
             str_contains($wfa, 'Severely') ||
             str_contains($hfa, 'Severely') ||
@@ -568,6 +566,7 @@ class PatientController extends Controller
             return 'Severe';
         }
 
+        // --- Moderate indicators ---
         if (
             in_array($wfa, ['Underweight'], true) ||
             in_array($hfa, ['Stunted'], true) ||
@@ -576,6 +575,7 @@ class PatientController extends Controller
             return 'Moderate';
         }
 
+        // --- At Risk ---
         if (
             in_array($wfa, ['Mildly Underweight'], true) ||
             in_array($wfh, ['Overweight'], true)
