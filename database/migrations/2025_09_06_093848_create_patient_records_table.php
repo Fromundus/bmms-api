@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger("patient_id");
             $table->date("date_measured");
-            $table->integer("weight");
-            $table->integer("height");
+            $table->decimal("weight", 10, 2);
+            $table->decimal("height", 10, 2);
             $table->integer("age");
             $table->string("weight_for_age"); //underweight //normal //overweight
             $table->string("height_for_age"); //stunted //normal //tall
