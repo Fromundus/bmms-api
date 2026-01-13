@@ -11,13 +11,32 @@ use App\Services\SMSService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-
 class PatientController extends Controller
 {
     public function getStats()
     {
-        // Load all patients with their latest record
-        $patients = Patient::with('latestRecord')->get();
+        $role = auth()->user()->role;
+
+        $query = Patient::with('latestRecord');
+
+        // 🔐 Apply role-based age filter
+        if ($role === 'bns') {
+            // 20 years old and below
+            $query->whereHas('latestRecord', function ($q) {
+                $q->where('age', '<', 20);
+            });
+        }
+
+        if ($role === 'bhw') {
+            // 21 years old and above
+            $query->whereHas('latestRecord', function ($q) {
+                $q->where('age', '>=', 20);
+            });
+        }
+        // admin → no filter
+
+        // Fetch only patients allowed for this role
+        $patients = $query->get();
 
         $totalPatients = $patients->count();
 
@@ -36,8 +55,7 @@ class PatientController extends Controller
             }
         }
 
-        // Helper to compute %
-        $percent = fn($count) => $totalPatients > 0
+        $percent = fn ($count) => $totalPatients > 0
             ? round(($count / $totalPatients) * 100, 2)
             : 0;
 
@@ -50,11 +68,10 @@ class PatientController extends Controller
         ]);
     }
 
-
     public function index(Request $request)
     {
         $search = $request->query('search');
-        $perPage = $request->query('per_page', 10);
+        $perPage = $request->query('per_page', 1000);
 
         $wfa = $request->query('wfa');
         $hfa = $request->query('hfa');
@@ -62,6 +79,23 @@ class PatientController extends Controller
         $status = $request->query('status');
 
         $query = Patient::query()->with("latestRecord");
+
+        $role = auth()->user()->role;
+
+        if ($role === 'bns') {
+            // 20 years old and below
+            $query->whereHas('latestRecord', function ($q) {
+                $q->where('age', '<', 20);
+            });
+        }
+
+        if ($role === 'bhw') {
+            // 21 years old and above
+            $query->whereHas('latestRecord', function ($q) {
+                $q->where('age', '>=', 20);
+            });
+        }
+
 
         if ($search) {
             $query->where(function ($q) use ($search) {

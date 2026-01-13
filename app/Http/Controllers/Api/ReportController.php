@@ -37,18 +37,60 @@ class ReportController extends Controller
     //     return response()->json(['error' => 'Invalid export type'], 400);
     // }
 
+    // public function export(Request $request, $type)
+    // {
+    //     $from = $request->query('from_date');
+    //     $to   = $request->query('to_date');
+
+    //     $query = PatientRecord::with('patient')
+    //         ->whereIn('id', function ($sub) use ($from, $to) {
+    //             $sub->selectRaw('MAX(id)')
+    //                 ->from('patient_records as pr2')
+    //                 ->when($from && $to, function ($q) use ($from, $to) {
+    //                     $q->whereBetween('date_measured', [$from, $to]);
+    //                 })
+    //                 ->groupBy('patient_id');
+    //         });
+
+    //     $records = $query->orderBy('date_measured', 'desc')->get();
+
+    //     if ($type === 'excel') {
+    //         return Excel::download(new PatientRecordsExport($records), 'patients.xlsx');
+    //     }
+
+    //     if ($type === 'pdf') {
+    //         $pdf = Pdf::loadView('reports.patients', ['records' => $records]);
+    //         return $pdf->download('patients.pdf');
+    //     }
+
+    //     return response()->json(['error' => 'Invalid export type'], 400);
+    // }
+
     public function export(Request $request, $type)
     {
         $from = $request->query('from_date');
         $to   = $request->query('to_date');
 
+        $role = auth()->user()->role;
+
         $query = PatientRecord::with('patient')
-            ->whereIn('id', function ($sub) use ($from, $to) {
+            ->whereIn('id', function ($sub) use ($from, $to, $role) {
                 $sub->selectRaw('MAX(id)')
                     ->from('patient_records as pr2')
+
+                    // 🔐 Role-based age filter
+                    ->when($role === 'bns', function ($q) {
+                        $q->where('age', '<', 20);
+                    })
+                    ->when($role === 'bhw', function ($q) {
+                        $q->where('age', '>=', 20);
+                    })
+
+                    // 📅 Date filter
                     ->when($from && $to, function ($q) use ($from, $to) {
                         $q->whereBetween('date_measured', [$from, $to]);
                     })
+
                     ->groupBy('patient_id');
             });
 
@@ -65,4 +107,5 @@ class ReportController extends Controller
 
         return response()->json(['error' => 'Invalid export type'], 400);
     }
+
 }
