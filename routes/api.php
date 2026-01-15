@@ -63,6 +63,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
         Route::post('/send-schedule', [SMSMessageController::class, 'sendSchedule']);
 
         Route::get('/generate-report', [ReportController::class, 'generateReport']);
+
+        Route::get('/reports', [ReportController::class, 'index']);
     });
     
     //USER ACCOUNTS
