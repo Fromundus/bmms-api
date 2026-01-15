@@ -61,6 +61,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
         Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 
         Route::post('/send-schedule', [SMSMessageController::class, 'sendSchedule']);
+
+        Route::get('/generate-report', [ReportController::class, 'generateReport']);
     });
     
     //USER ACCOUNTS
