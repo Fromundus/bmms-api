@@ -25,7 +25,7 @@ class Patient extends Model
         "immunizations",
         "last_deworming_date",
         "allergies",
-        "medical_history",
+        // "medical_history",
         "notes",
 
         "status",

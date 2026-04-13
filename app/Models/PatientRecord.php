@@ -21,6 +21,11 @@ class PatientRecord extends Model
         "allergies",
         "medical_history",
         "notes",
+
+        "birth_history",
+        "past_illnesses",
+        "current_medication",
+        "family_medical_history",
         
         "status",
 

@@ -396,7 +396,8 @@ class ReportController extends Controller
         // 4. Call Gemini API
         $client = new Client();
         $response = $client->post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCHhGWj3YK0X18P37DuhTvbJa1_lx1z6G8",
+            // "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCHhGWj3YK0X18P37DuhTvbJa1_lx1z6G8",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyDkMMEPdtfhhhAbf1FfOT85Sm3ykTU0yAM",
             [
                 'json' => [
                     "contents" => [

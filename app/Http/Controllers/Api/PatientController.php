@@ -170,6 +170,11 @@ class PatientController extends Controller
             'medical_history' => 'nullable|string',
             'notes' => 'nullable|string',
 
+            "birth_history" => "nullable|string",
+            "past_illnesses" => "nullable|string",
+            "current_medication" => "nullable|string",
+            "family_medical_history" => "nullable|string",
+
             'questionnaire_data' => 'nullable|array',
         ]);
 
@@ -222,6 +227,12 @@ class PatientController extends Controller
                 'medical_history' => $validated["medical_history"],
                 'notes' => $validated["notes"],
                 'status' => $validated["status"],
+
+                "birth_history" => $validated["birth_history"],
+                "past_illnesses" => $validated["past_illnesses"],
+                "current_medication" => $validated["current_medication"],
+                "family_medical_history" => $validated["family_medical_history"],
+
 
                 'likely_cause' => implode(',', $likelyCause),
                 'questionnaire_data' => $validated['questionnaire_data'],
@@ -377,6 +388,12 @@ class PatientController extends Controller
             'allergies' => 'nullable|string',
             'medical_history' => 'nullable|string',
             'notes' => 'nullable|string',
+
+            "birth_history" => "nullable|string",
+            "past_illnesses" => "nullable|string",
+            "current_medication" => "nullable|string",
+            "family_medical_history" => "nullable|string",
+
             'questionnaire_data' => 'nullable|array',
         ]);
 
@@ -435,6 +452,11 @@ class PatientController extends Controller
                 'medical_history' => $validated["medical_history"],
                 'notes' => $validated["notes"],
                 'status' => $validated["status"],
+
+                "birth_history" => $validated["birth_history"],
+                "past_illnesses" => $validated["past_illnesses"],
+                "current_medication" => $validated["current_medication"],
+                "family_medical_history" => $validated["family_medical_history"],
 
                 'likely_cause' => implode(',', $likelyCause),
                 'questionnaire_data' => $validated['questionnaire_data'],
