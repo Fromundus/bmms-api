@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\RegisteredMemberController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SMSMessageController;
+use App\Http\Controllers\Api\SummaryController;
 use App\Http\Controllers\Api\UserController;
 use App\Models\Patient;
 use App\Models\PatientRecord;
@@ -65,6 +66,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
         Route::get('/generate-report', [ReportController::class, 'generateReport']);
 
         Route::get('/reports', [ReportController::class, 'index']);
+
+        //SUMARRY
+
+        Route::get('/summaries', [SummaryController::class, 'index']);
+        Route::post('/summaries', [SummaryController::class, 'generate']);
     });
     
     //USER ACCOUNTS
