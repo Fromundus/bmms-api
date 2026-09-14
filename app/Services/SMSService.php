@@ -11,8 +11,8 @@ class SMSService
 
     public function __construct()
     {
-        $this->baseUrl = "https://sms.iprogtech.com/api/v1";
-        $this->apiToken = "e5ae38f927ec77016fb64f08435b340eecf034f4";
+        $this->baseUrl = config('services.iprogtech_sms.base_url');
+        $this->apiToken = config('services.iprogtech_sms.token');
     }
 
     /**
@@ -28,16 +28,16 @@ class SMSService
 
         $response = Http::asJson()
             ->post("{$this->baseUrl}/sms_messages", [
-                'api_token'    => $this->apiToken,
+                'api_token' => $this->apiToken,
                 'phone_number' => $formattedNumber,
-                'message'      => $message,
+                'message' => $message,
             ]);
 
         if ($response->failed()) {
             return [
-                'status'  => $response->status(),
+                'status' => $response->status(),
                 'message' => 'Failed to send SMS.',
-                'error'   => $response->json(),
+                'error' => $response->json(),
             ];
         }
 
@@ -46,10 +46,12 @@ class SMSService
 
     private function formatNumber(string $number): string
     {
-        $number = preg_replace('/\D/', '', $number); // remove non-digits
+        $number = preg_replace('/\D/', '', $number);
+
         if (str_starts_with($number, '09')) {
             $number = '63' . substr($number, 1);
         }
+
         return $number;
     }
 }
