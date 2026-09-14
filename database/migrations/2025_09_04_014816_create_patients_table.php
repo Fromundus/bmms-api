@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string("sex");
             $table->date("birthday");
             $table->string("contact_number");
+            $table->boolean('belongs_to_ip')->default(false);
             
             // $table->date("date_measured");
             // $table->integer("weight");

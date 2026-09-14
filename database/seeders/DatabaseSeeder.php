@@ -45,5 +45,9 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make("1234"),
             'role' => 'bhw',
         ]);
+
+        $this->call([
+            PatientSeeder::class,
+        ]);
     }
 }

@@ -159,6 +159,7 @@ class PatientController extends Controller
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
             'contact_number' => 'required|string|min:11|max:11',
+            'belongs_to_ip' => 'required|boolean',
 
             'date_measured' => 'required|date',
             'weight' => 'required|numeric',
@@ -222,6 +223,7 @@ class PatientController extends Controller
             'sex' => $validated["sex"],
             'birthday' => $validated["birthday"],
             'contact_number' => $validated["contact_number"],
+            'belongs_to_ip' => $validated["belongs_to_ip"],
         ]);
 
         if($patient){
@@ -294,6 +296,7 @@ class PatientController extends Controller
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
             'contact_number' => 'required|string|min:11|max:11',
+            'belongs_to_ip' => 'required|boolean',
         ]);
 
         // Recompute age if birthday or measured date changed
@@ -326,6 +329,7 @@ class PatientController extends Controller
             'sex' => $validated["sex"],
             'birthday' => $validated["birthday"],
             'contact_number' => $validated["contact_number"],
+            'belongs_to_ip' => $validated["belongs_to_ip"],
         ]);
 
         $latestRecord = PatientRecord::where("patient_id", $patient->id)->latest("id")->first();
