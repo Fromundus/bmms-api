@@ -178,6 +178,20 @@ class PatientController extends Controller
             'questionnaire_data' => 'nullable|array',
         ]);
 
+        $exists = Patient::where('name', $validated['name'])
+            ->whereDate('birthday', $validated['birthday'])
+            ->where('sex', $validated['sex'])
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'message' => 'Resident already exists.',
+                'errors' => [
+                    'name' => ['A resident with the same name, birthday, and sex already exists.'],
+                ],
+            ], 422);
+        }
+
         // Age in years
         $validated['age'] = Carbon::parse($validated['birthday'])
             ->diffInYears(Carbon::parse($validated['date_measured']));
