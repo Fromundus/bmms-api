@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -36,7 +37,7 @@ class AuthController extends Controller
         return response()->json($user, 201);
     }
 
-    public function login(Request $request)
+    public function login(Request $request, ActivityLogService $activityLogService)
     {
         $credentials = $request->validate([
             'email' => 'required|string|email',
@@ -66,13 +67,21 @@ class AuthController extends Controller
         
         $token = $user->createToken('api_token')->plainTextToken;
 
-        ActivityLog::create([
-            'user_id' => $user->id,
-            'action' => 'login',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->header('User-Agent'),
-            'logged_at' => now(),
-        ]);
+        // ActivityLog::create([
+        //     'user_id' => $user->id,
+        //     'action' => 'login',
+        //     'message' => 'Login',
+        //     'ip_address' => $request->ip(),
+        //     'user_agent' => $request->header('User-Agent'),
+        //     'logged_at' => now(),
+        // ]);
+
+        $activityLogService->log(
+            $user->id,
+            'login',
+            "{$user->name} logged in.",
+            $request
+        );
 
         return response()->json([
             'access_token' => $token,
@@ -86,15 +95,22 @@ class AuthController extends Controller
         return response()->json($request->user());
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request, ActivityLogService $activityLogService)
     {
-        ActivityLog::create([
-            'user_id' => auth()->id(),
-            'action' => 'logout',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->header('User-Agent'),
-            'logged_at' => now(),
-        ]);
+        // ActivityLog::create([
+        //     'user_id' => auth()->id(),
+        //     'action' => 'logout',
+        //     'ip_address' => $request->ip(),
+        //     'user_agent' => $request->header('User-Agent'),
+        //     'logged_at' => now(),
+        // ]);
+
+        $activityLogService->log(
+            auth()->id(),
+            'logout',
+            "{$request->user()->name} logged out.",
+            $request
+        );
         
         $request->user()->currentAccessToken()->delete();
 

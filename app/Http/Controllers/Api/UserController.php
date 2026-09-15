@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,7 +59,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ActivityLogService $activityLogService)
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -79,6 +80,13 @@ class UserController extends Controller
             'email_verified_at' => Carbon::now(),
             'role' => $request->role,
         ]);
+
+        $activityLogService->log(
+            auth()->id(),
+            'create',
+            "{$request->user()->name} created a new user: {$user->name}.",
+            $request
+        );
 
         return response()->noContent();
     }
@@ -160,7 +168,7 @@ class UserController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, ActivityLogService $activityLogService)
     {
         $user = User::where("id", $id)->first();
 
@@ -183,6 +191,13 @@ class UserController extends Controller
                     "role" => $request->role,
                     "email" => $request->email,
                 ]);
+
+                $activityLogService->log(
+                    auth()->id(),
+                    'update',
+                    "{$request->user()->name} updated a user: {$user->name}.",
+                    $request
+                );
 
                 return response()->json([
                     "status" => "200",
@@ -214,7 +229,7 @@ class UserController extends Controller
         return response()->json(["message" => "Password Reset Success"], 200);
     }
 
-    public function delete(Request $request){
+    public function delete(Request $request, ActivityLogService $activityLogService){
         $validated = $request->validate([
             'ids' => 'required|array',
         ]);
@@ -223,9 +238,14 @@ class UserController extends Controller
 
         User::whereIn('id', $validated['ids'])->delete();
 
-        // foreach($users as $user){
-        //     ActivityLogger::log('delete', 'account', "Deleted account: #" . $user->id . " " . $user->name);
-        // }
+        foreach($users as $user){
+            $activityLogService->log(
+                auth()->id(),
+                'delete',
+                "{$request->user()->name} deleted a user: {$user->name}.",
+                $request
+            );
+        }
 
         return response()->json(['message' => 'Users deleted successfully']);
     }

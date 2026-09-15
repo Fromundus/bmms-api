@@ -7,6 +7,7 @@ use App\Models\Notification;
 use App\Models\Patient;
 use App\Models\PatientRecord;
 use App\Models\Setting;
+use App\Services\ActivityLogService;
 use App\Services\SMSService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -151,7 +152,7 @@ class PatientController extends Controller
         return response()->json($patient);
     }
     
-    public function store(Request $request, SMSService $smsservice)
+    public function store(Request $request, SMSService $smsservice, ActivityLogService $activityLogService)
     {
         $validated = $request->validate([
             'name' => 'required|string',
@@ -254,6 +255,13 @@ class PatientController extends Controller
                 'questionnaire_data' => $validated['questionnaire_data'],
             ]);
 
+            $activityLogService->log(
+                auth()->id(),
+                'create',
+                "{$request->user()->name} created a new resident: {$patient->name}.",
+                $request
+            );
+
             /**
              * ✅ Create Notification for Admins (Monitoring)
              */
@@ -286,7 +294,7 @@ class PatientController extends Controller
         return response()->json(["data" => $patient, "response" => $response], 200);
     }
 
-    public function updateInformation(Request $request, $id, SMSService $smsservice)
+    public function updateInformation(Request $request, $id, SMSService $smsservice, ActivityLogService $activityLogService)
     {
         $patient = Patient::with("latestRecord")->findOrFail($id);
 
@@ -331,6 +339,13 @@ class PatientController extends Controller
             'contact_number' => $validated["contact_number"],
             'belongs_to_ip' => $validated["belongs_to_ip"],
         ]);
+
+        $activityLogService->log(
+            auth()->id(),
+            'update',
+            "{$request->user()->name} updated a resident: {$patient->name}.",
+            $request
+        );
 
         $latestRecord = PatientRecord::where("patient_id", $patient->id)->latest("id")->first();
 
@@ -385,7 +400,7 @@ class PatientController extends Controller
     }
 
     //THIS IS FOR ADDING NEW RECORDS
-    public function updateOrAddRecords(Request $request, $id, SMSService $smsservice)
+    public function updateOrAddRecords(Request $request, $id, SMSService $smsservice, ActivityLogService $activityLogService)
     {
         $patient = Patient::with("latestRecord")->findOrFail($id);
 
@@ -480,6 +495,13 @@ class PatientController extends Controller
                 'questionnaire_data' => $validated['questionnaire_data'],
             ]);
 
+            $activityLogService->log(
+                auth()->id(),
+                'create',
+                "{$request->user()->name} created a new record for resident: {$patient->name}.",
+                $request
+            );
+
             /**
              * ✅ Create Notification for Admin Monitoring
              */
@@ -547,13 +569,20 @@ class PatientController extends Controller
         return $causes;
     }
 
-    public function delete(Request $request)
+    public function delete(Request $request, ActivityLogService $activityLogService)
     {
         $validated = $request->validate([
             'ids' => 'required|array',
         ]);
 
         Patient::whereIn('id', $validated['ids'])->delete();
+
+        $activityLogService->log(
+            auth()->id(),
+            'delete',
+            "{$request->user()->name} deleted a resident.",
+            $request
+        );
 
         return response()->json(['message' => 'Patients deleted successfully']);
     }

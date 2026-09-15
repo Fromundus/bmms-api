@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('action'); // e.g., "login", "logout"
+            $table->text('message'); // e.g., "login", "logout"
             $table->string('ip_address')->nullable();
             $table->string('user_agent')->nullable();
             $table->timestamp('logged_at');
