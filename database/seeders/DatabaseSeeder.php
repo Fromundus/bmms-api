@@ -15,8 +15,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call([
+            RolePermissionSeeder::class,
+        ]);
+
         // User::factory(10)->create();
-        User::factory()->create([
+        $admin = User::factory()->create([
             'name' => 'Admin',
             'contact_number' => '11111111111',
             'email' => 'admin@test.com',
@@ -26,7 +30,9 @@ class DatabaseSeeder extends Seeder
             'role' => 'admin',
         ]);
 
-        User::factory()->create([
+        $admin->assignRole('admin');
+
+        $bns = User::factory()->create([
             'name' => 'Barangay Nutrition Scholar',
             'contact_number' => '09123456789',
             'email' => 'bns@test.com',
@@ -36,7 +42,9 @@ class DatabaseSeeder extends Seeder
             'role' => 'bns',
         ]);
 
-        User::factory()->create([
+        $bns->assignRole('bns');
+
+        $bhw = User::factory()->create([
             'name' => 'Barangay Health Worker',
             'contact_number' => '09987654321',
             'email' => 'bhw@test.com',
@@ -46,8 +54,11 @@ class DatabaseSeeder extends Seeder
             'role' => 'bhw',
         ]);
 
+        $bhw->assignRole('bhw');
+
         $this->call([
             PatientSeeder::class,
         ]);
+        
     }
 }
