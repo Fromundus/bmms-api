@@ -161,6 +161,7 @@ class PatientController extends Controller
             'birthday' => 'required|date',
             'contact_number' => 'required|string|min:11|max:11',
             'belongs_to_ip' => 'required|boolean',
+            'is_pregnant' => 'required|boolean',
 
             'date_measured' => 'required|date',
             'weight' => 'required|numeric',
@@ -225,6 +226,7 @@ class PatientController extends Controller
             'birthday' => $validated["birthday"],
             'contact_number' => $validated["contact_number"],
             'belongs_to_ip' => $validated["belongs_to_ip"],
+            'is_pregnant' => $validated["is_pregnant"],
         ]);
 
         if($patient){
@@ -305,6 +307,7 @@ class PatientController extends Controller
             'birthday' => 'required|date',
             'contact_number' => 'required|string|min:11|max:11',
             'belongs_to_ip' => 'required|boolean',
+            'is_pregnant' => 'required|boolean',
         ]);
 
         // Recompute age if birthday or measured date changed
@@ -338,6 +341,7 @@ class PatientController extends Controller
             'birthday' => $validated["birthday"],
             'contact_number' => $validated["contact_number"],
             'belongs_to_ip' => $validated["belongs_to_ip"],
+            'is_pregnant' => $validated["is_pregnant"],
         ]);
 
         $activityLogService->log(

@@ -10,6 +10,7 @@ class Patient extends Model
         "name",
         "address",
         "belongs_to_ip",
+        "is_pregnant",
         "sex",
         "birthday",
         "contact_number",
