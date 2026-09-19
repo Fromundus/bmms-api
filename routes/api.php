@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Models\Patient;
 use App\Models\PatientRecord;
 use App\Services\SMSService;
+use App\Services\WHOAnthropometryService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -91,4 +92,16 @@ Route::get('/test', function(){
 Route::get('/test/sms-iprog', function(SMSService $smsservice){
     $response = $smsservice->sendSms('09664574089', 'Hello John Carl Cueva, your new nutrition record from 2025-10-20 has been added.');
     return response()->json($response);
+});
+
+Route::get('/testing/{sex}/{age_days}/{weight}/{height}', function($sex, $age_days, $weight, $height, WHOAnthropometryService $who){
+    $assessment = $who->assess([
+        "sex" => $sex,
+        // "age_days" => $age_days,
+        "date_of_birth" => $age_days,
+        "weight" => $weight,
+        "height" => $height,
+    ]);
+
+    return response()->json($assessment);
 });

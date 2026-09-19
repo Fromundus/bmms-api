@@ -15,6 +15,8 @@ class PatientRecord extends Model
         "weight_for_age",
         "height_for_age",
         "weight_for_ltht_status",
+        "bmi_for_age",
+        "bmi",
 
         "immunizations",
         "last_deworming_date",

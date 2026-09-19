@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Setting;
+use App\Services\WHOAnthropometryService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Faker\Factory as Faker;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class PatientSeeder extends Seeder
 {
-    public function run(): void
+    public function run(WHOAnthropometryService $who): void
     {
         $faker = Faker::create();
 
@@ -21,29 +22,28 @@ class PatientSeeder extends Seeder
             $weight = $faker->numberBetween(3, 120); // kg
             $height = $faker->numberBetween(50, 200); // cm
 
-            // Compute BMI
-            $bmi = $weight / pow($height / 100, 2);
-
-            // Compute categories
-            $wfa = $this->computeWFA($age, $weight);
-            $hfa = $this->computeHFA($age, $height);
-            $wfs = $this->computeWFHOrBMI($age, $bmi);
-
-            // Overall status
-            $status = $this->computeOverallStatus($wfa, $hfa, $wfs);
-
             // Optional deworming date
             $deworming = $faker->optional()->dateTimeBetween('-2 years', 'now');
+
+            $sex = $faker->randomElement(['Male', 'Female']);
+            $birthday = $birthday->format('Y-m-d');
 
             // 1️⃣ Insert patient
             $patientId = DB::table('patients')->insertGetId([
                 'name'            => $faker->name,
                 'address'         => $faker->address,
-                'sex'             => $faker->randomElement(['Male', 'Female']),
-                'birthday'        => $birthday->format('Y-m-d'),
+                'sex'             => $sex,
+                'birthday'        => $birthday,
                 'contact_number'  => $faker->phoneNumber,
                 'created_at'      => now(),
                 'updated_at'      => now(),
+            ]);
+
+            $assessment = $who->assess([
+                "sex" => $sex,
+                "date_of_birth" => $birthday,
+                "weight" => $weight,
+                "height" => $height,
             ]);
 
             // 2️⃣ Insert patient record (linked to patient)
@@ -53,9 +53,12 @@ class PatientSeeder extends Seeder
                 'weight'               => $weight,
                 'height'               => $height,
                 'age'                  => $age,
-                'weight_for_age'       => $wfa,
-                'height_for_age'       => $hfa,
-                'weight_for_ltht_status' => $wfs,
+                "weight_for_age" => $assessment["wfa_status"],
+                "height_for_age" => $assessment["hfa_status"],
+                "weight_for_ltht_status" => $assessment["wfl_status"],
+                "bmi_for_age" => $assessment["bfa_status"],
+                "bmi" => $assessment["bmi_status"] ?? null,
+
                 'immunizations'        => implode(', ', $faker->randomElements(
                     ['BCG', 'DPT', 'Polio', 'Measles', 'Hepatitis B'],
                     $faker->numberBetween(1, 5)
@@ -68,112 +71,10 @@ class PatientSeeder extends Seeder
                 "current_medication"    => $faker->optional()->sentence(10),
                 "family_medical_history"    => $faker->optional()->sentence(10),
                 'notes'                => $faker->sentence(15),
-                'status'               => $status,
+                'status'               => $assessment["overall_status"],
                 'created_at'           => now(),
                 'updated_at'           => now(),
             ]);
         }
-    }
-
-    private function computeWFA($age, $weight)
-    {
-        if ($age < 5) {
-            if ($weight < 10) return 'Severely Underweight';
-            if ($weight < 14) return 'Underweight';
-        } elseif ($age < 10) {
-            if ($weight < 20) return 'Underweight';
-            if ($weight < 25) return 'Mildly Underweight';
-        } elseif ($age < 20) {
-            if ($weight < 40) return 'Underweight';
-        } else {
-            // Adults: screening only
-            if ($weight < 40) return 'Underweight';
-            if ($weight > 100) return 'Overweight';
-        }
-
-        return 'Normal';
-    }
-
-    private function computeHFA($age, $height)
-    {
-        if ($age < 5) {
-            if ($height < 85) return 'Severely Stunted';
-            if ($height < 95) return 'Stunted';
-        } elseif ($age < 10) {
-            if ($height < 120) return 'Stunted';
-        } elseif ($age < 20) {
-            if ($height < 150) return 'Stunted';
-        } else {
-            // Adults: historical screening
-            if ($height < 145) return 'Stunted';
-        }
-
-        return 'Normal';
-    }
-
-    private function computeWFHOrBMI($age, $bmi)
-    {
-        // CHILDREN & ADOLESCENTS (5–19 years)
-        if ($age < 20) {
-            if ($bmi < 14) return 'Severely Wasted';
-            if ($bmi < 16) return 'Wasted';
-            if ($bmi > 27) return 'Obese';
-            if ($bmi > 23) return 'Overweight';
-            return 'Normal';
-        }
-
-        // ADULTS (≥20 years)
-        if ($bmi < 16) return 'Severely Wasted';
-        if ($bmi < 18.5) return 'Wasted';
-        if ($bmi >= 30) return 'Obese';
-        if ($bmi >= 25) return 'Overweight';
-
-        return 'Normal';
-    }
-
-    private function computeOverallStatus($wfa, $hfa, $wfh, $bmi = null)
-    {
-        if ($bmi !== null) {
-
-            if ($bmi < 16 || $bmi >= 30) {
-                return 'Severe';
-            }
-
-            if (($bmi >= 16 && $bmi < 18.5) || ($bmi >= 25 && $bmi < 30)) {
-                return 'Moderate';
-            }
-
-            if ($bmi >= 18.5 && $bmi < 20) {
-                return 'At Risk';
-            }
-        }
-
-        // --- Severe growth indicators ---
-        if (
-            str_contains($wfa, 'Severely') ||
-            str_contains($hfa, 'Severely') ||
-            str_contains($wfh, 'Severely')
-        ) {
-            return 'Severe';
-        }
-
-        // --- Moderate indicators ---
-        if (
-            in_array($wfa, ['Underweight'], true) ||
-            in_array($hfa, ['Stunted'], true) ||
-            in_array($wfh, ['Wasted', 'Obese'], true)
-        ) {
-            return 'Moderate';
-        }
-
-        // --- At Risk ---
-        if (
-            in_array($wfa, ['Mildly Underweight'], true) ||
-            in_array($wfh, ['Overweight'], true)
-        ) {
-            return 'At Risk';
-        }
-
-        return 'Healthy';
     }
 }

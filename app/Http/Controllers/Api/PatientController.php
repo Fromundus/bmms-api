@@ -9,6 +9,7 @@ use App\Models\PatientRecord;
 use App\Models\Setting;
 use App\Services\ActivityLogService;
 use App\Services\SMSService;
+use App\Services\WHOAnthropometryService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -152,7 +153,7 @@ class PatientController extends Controller
         return response()->json($patient);
     }
     
-    public function store(Request $request, SMSService $smsservice, ActivityLogService $activityLogService)
+    public function store(Request $request, SMSService $smsservice, ActivityLogService $activityLogService, WHOAnthropometryService $who)
     {
         $validated = $request->validate([
             'name' => 'required|string',
@@ -195,27 +196,19 @@ class PatientController extends Controller
             ], 422);
         }
 
+        $assessment = $who->assess([
+            "sex" => $validated["sex"],
+            "date_of_birth" => $validated["birthday"],
+            "weight" => $validated["weight"],
+            "height" => $validated["height"],
+        ]);
+
         // Age in years
         $validated['age'] = Carbon::parse($validated['birthday'])
             ->diffInYears(Carbon::parse($validated['date_measured']));
 
-        // Compute BMI
-        $bmi = $validated['weight'] / pow($validated['height'] / 100, 2);
-
-        // Compute nutrition
-        $validated['weight_for_age'] = $this->computeWFA($validated['age'], $validated['weight']);
-        $validated['height_for_age'] = $this->computeHFA($validated['age'], $validated['height']);
-        $validated['weight_for_ltht_status'] = $this->computeWFHOrBMI($validated['age'], $bmi);
-
-        // Overall status
-        $validated['status'] = $this->computeOverallStatus(
-            $validated['weight_for_age'],
-            $validated['height_for_age'],
-            $validated['weight_for_ltht_status']
-        );
-
         $questionnaire = $validated['questionnaire_data'] ?? [];
-        $likelyCause = $this->analyzeMalnutritionCause($validated['status'], $questionnaire);
+        $likelyCause = $this->analyzeMalnutritionCause($assessment['overall_status'], $questionnaire);
 
         Log::info($questionnaire);
 
@@ -228,7 +221,7 @@ class PatientController extends Controller
             'belongs_to_ip' => $validated["belongs_to_ip"],
             'is_pregnant' => $validated["is_pregnant"],
         ]);
-
+        
         if($patient){
             PatientRecord::create([
                 'patient_id' => $patient->id,
@@ -236,16 +229,18 @@ class PatientController extends Controller
                 'weight' => $validated["weight"],
                 'height' => $validated["height"],
                 'age' => $validated["age"],
-                "weight_for_age" => $validated["weight_for_age"],
-                "height_for_age" => $validated["height_for_age"],
-                "weight_for_ltht_status" => $validated["weight_for_ltht_status"],
+                "weight_for_age" => $assessment["wfa_status"],
+                "height_for_age" => $assessment["hfa_status"],
+                "weight_for_ltht_status" => $assessment["wfl_status"],
+                "bmi_for_age" => $assessment["bfa_status"],
+                "bmi" => $assessment["bmi_status"] ?? null,
                 
                 'immunizations' => $validated["immunizations"],
                 'last_deworming_date' => $validated["last_deworming_date"],
                 'allergies' => $validated["allergies"],
                 'medical_history' => $validated["medical_history"],
                 'notes' => $validated["notes"],
-                'status' => $validated["status"],
+                'status' => $assessment["overall_status"],
 
                 "birth_history" => $validated["birth_history"],
                 "past_illnesses" => $validated["past_illnesses"],
@@ -267,7 +262,7 @@ class PatientController extends Controller
             /**
              * ✅ Create Notification for Admins (Monitoring)
              */
-            $status = ucfirst($validated['status']);
+            $status = ucfirst($assessment['overall_status']);
             $causes = !empty($likelyCause)
                 ? implode(', ', $likelyCause)
                 : 'No likely causes identified';
@@ -286,17 +281,18 @@ class PatientController extends Controller
 
             // $patientMessage = "Hi {$patient->name}, your nutrition record dated {$validated['date_measured']} was added. Status: {$validated['status']}. Please follow you health worker's advice.";
 
-            $patientMessage = "Hi {$patient->name}, your nutrition record dated {$validated['date_measured']} was added. Status: {$validated['status']}" 
+            $patientMessage = "Hi {$patient->name}, your nutrition record dated {$validated['date_measured']} was added. Status: {$assessment['overall_status']}" 
             . (!empty($causes) ? ", cause(s): {$causes}." : ".") 
             . " Please follow your health worker's advice.";
 
             $response = $smsservice->sendSms("{$patient->contact_number}", $patientMessage);
+            // $response = "";
         }
 
         return response()->json(["data" => $patient, "response" => $response], 200);
     }
 
-    public function updateInformation(Request $request, $id, SMSService $smsservice, ActivityLogService $activityLogService)
+    public function updateInformation(Request $request, $id, SMSService $smsservice, ActivityLogService $activityLogService, WHOAnthropometryService $who)
     {
         $patient = Patient::with("latestRecord")->findOrFail($id);
 
@@ -323,16 +319,12 @@ class PatientController extends Controller
         $height = $validated['height'] ?? $patient->latestRecord->height;
         $age = $validated['age'] ?? $patient->latestRecord->age;
 
-        $bmi = $weight / pow($height / 100, 2);
-
-        $wfa = $this->computeWFA($age, $weight);
-        $hfa = $this->computeHFA($age, $height);
-        $wfs = $this->computeWFHOrBMI($age, $bmi);
-
-        $validated['weight_for_age'] = $wfa;
-        $validated['height_for_age'] = $hfa;
-        $validated['weight_for_ltht_status'] = $wfs;
-        $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
+        $assessment = $who->assess([
+            "sex" => $patient->sex,
+            "date_of_birth" => $patient->birthday,
+            "weight" => $weight,
+            "height" => $height,
+        ]);
 
         $patient->update([
             'name' => $validated["name"],
@@ -375,7 +367,7 @@ class PatientController extends Controller
             /**
              * ✅ Create Notification for Admins (Monitoring)
              */
-            $status = ucfirst($validated['status']);
+            $status = ucfirst($assessment['overall_status']);
             $previousStatus = ucfirst($latestRecord->status ?? 'N/A');
 
             // Build notification message
@@ -398,13 +390,14 @@ class PatientController extends Controller
             . " Keep following your health worker's advice.";
 
             $response = $smsservice->sendSms($patient->contact_number, $patientMessage);
+            // $response = "";
         }
 
         return response()->json(["data" => $patient, "response" => $response], 200);
     }
 
     //THIS IS FOR ADDING NEW RECORDS
-    public function updateOrAddRecords(Request $request, $id, SMSService $smsservice, ActivityLogService $activityLogService)
+    public function updateOrAddRecords(Request $request, $id, SMSService $smsservice, ActivityLogService $activityLogService, WHOAnthropometryService $who)
     {
         $patient = Patient::with("latestRecord")->findOrFail($id);
 
@@ -447,19 +440,15 @@ class PatientController extends Controller
         $height = $validated['height'] ?? $patient->latestRecord->height;
         $age = $validated['age'] ?? $patient->latestRecord->age;
 
-        $bmi = $weight / pow($height / 100, 2);
-
-        $wfa = $this->computeWFA($age, $weight);
-        $hfa = $this->computeHFA($age, $height);
-        $wfs = $this->computeWFHOrBMI($age, $bmi);
-
-        $validated['weight_for_age'] = $wfa;
-        $validated['height_for_age'] = $hfa;
-        $validated['weight_for_ltht_status'] = $wfs;
-        $validated['status'] = $this->computeOverallStatus($wfa, $hfa, $wfs);
+        $assessment = $who->assess([
+            "sex" => $patient->sex,
+            "date_of_birth" => $patient->birthday,
+            "weight" => $weight,
+            "height" => $height,
+        ]);
 
         $questionnaire = $validated['questionnaire_data'] ?? [];
-        $likelyCause = $this->analyzeMalnutritionCause($validated['status'], $questionnaire);
+        $likelyCause = $this->analyzeMalnutritionCause($assessment['overall_status'], $questionnaire);
 
         Log::info($questionnaire);
 
@@ -479,16 +468,18 @@ class PatientController extends Controller
                 'weight' => $validated["weight"],
                 'height' => $validated["height"],
                 'age' => $validated["age"],
-                "weight_for_age" => $validated["weight_for_age"],
-                "height_for_age" => $validated["height_for_age"],
-                "weight_for_ltht_status" => $validated["weight_for_ltht_status"],
+                "weight_for_age" => $assessment["wfa_status"],
+                "height_for_age" => $assessment["hfa_status"],
+                "weight_for_ltht_status" => $assessment["wfl_status"],
+                "bmi_for_age" => $assessment["bfa_status"],
+                "bmi" => $assessment["bmi_status"] ?? null,
                 
                 'immunizations' => $validated["immunizations"],
                 'last_deworming_date' => $validated["last_deworming_date"],
                 'allergies' => $validated["allergies"],
                 'medical_history' => $validated["medical_history"],
                 'notes' => $validated["notes"],
-                'status' => $validated["status"],
+                'status' => $assessment["overall_status"],
 
                 "birth_history" => $validated["birth_history"],
                 "past_illnesses" => $validated["past_illnesses"],
@@ -509,7 +500,7 @@ class PatientController extends Controller
             /**
              * ✅ Create Notification for Admin Monitoring
              */
-            $status = ucfirst($validated['status']);
+            $status = ucfirst($assessment["overall_status"]);
             $causeList = implode(', ', $likelyCause) ?: 'No likely cause identified';
 
             $message = "A new record has been added for **{$patient->name}**.\n\n"
@@ -529,6 +520,7 @@ class PatientController extends Controller
 
 
             $response = $smsservice->sendSms($patient->contact_number, $patientMessage);
+            // $response = "";
         }
 
         return response()->json(["data" => $patient, "response" => $response], 200);
@@ -589,107 +581,5 @@ class PatientController extends Controller
         );
 
         return response()->json(['message' => 'Patients deleted successfully']);
-    }
-
-    private function computeWFA($age, $weight)
-    {
-        if ($age < 5) {
-            if ($weight < 10) return 'Severely Underweight';
-            if ($weight < 14) return 'Underweight';
-        } elseif ($age < 10) {
-            if ($weight < 20) return 'Underweight';
-            if ($weight < 25) return 'Mildly Underweight';
-        } elseif ($age < 20) {
-            if ($weight < 40) return 'Underweight';
-        } else {
-            // Adults: screening only
-            if ($weight < 40) return 'Underweight';
-            if ($weight > 100) return 'Overweight';
-        }
-
-        return 'Normal';
-    }
-
-    private function computeHFA($age, $height)
-    {
-        if ($age < 5) {
-            if ($height < 85) return 'Severely Stunted';
-            if ($height < 95) return 'Stunted';
-        } elseif ($age < 10) {
-            if ($height < 120) return 'Stunted';
-        } elseif ($age < 20) {
-            if ($height < 150) return 'Stunted';
-        } else {
-            // Adults: historical screening
-            if ($height < 145) return 'Stunted';
-        }
-
-        return 'Normal';
-    }
-
-    private function computeWFHOrBMI($age, $bmi)
-    {
-        // CHILDREN & ADOLESCENTS (5–19 years)
-        if ($age < 20) {
-            if ($bmi < 14) return 'Severely Wasted';
-            if ($bmi < 16) return 'Wasted';
-            if ($bmi > 27) return 'Obese';
-            if ($bmi > 23) return 'Overweight';
-            return 'Normal';
-        }
-
-        // ADULTS (≥20 years)
-        if ($bmi < 16) return 'Severely Wasted';
-        if ($bmi < 18.5) return 'Wasted';
-        if ($bmi >= 30) return 'Obese';
-        if ($bmi >= 25) return 'Overweight';
-
-        return 'Normal';
-    }
-
-    private function computeOverallStatus($wfa, $hfa, $wfh, $bmi = null)
-    {
-        if ($bmi !== null) {
-
-            if ($bmi < 16 || $bmi >= 30) {
-                return 'Severe';
-            }
-
-            if (($bmi >= 16 && $bmi < 18.5) || ($bmi >= 25 && $bmi < 30)) {
-                return 'Moderate';
-            }
-
-            if ($bmi >= 18.5 && $bmi < 20) {
-                return 'At Risk';
-            }
-        }
-
-        // --- Severe growth indicators ---
-        if (
-            str_contains($wfa, 'Severely') ||
-            str_contains($hfa, 'Severely') ||
-            str_contains($wfh, 'Severely')
-        ) {
-            return 'Severe';
-        }
-
-        // --- Moderate indicators ---
-        if (
-            in_array($wfa, ['Underweight'], true) ||
-            in_array($hfa, ['Stunted'], true) ||
-            in_array($wfh, ['Wasted', 'Obese'], true)
-        ) {
-            return 'Moderate';
-        }
-
-        // --- At Risk ---
-        if (
-            in_array($wfa, ['Mildly Underweight'], true) ||
-            in_array($wfh, ['Overweight'], true)
-        ) {
-            return 'At Risk';
-        }
-
-        return 'Healthy';
     }
 }

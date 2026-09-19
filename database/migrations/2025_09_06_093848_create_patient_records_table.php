@@ -18,9 +18,11 @@ return new class extends Migration
             $table->decimal("weight", 10, 2);
             $table->decimal("height", 10, 2);
             $table->integer("age");
-            $table->string("weight_for_age"); //underweight //normal //overweight
-            $table->string("height_for_age"); //stunted //normal //tall
-            $table->string("weight_for_ltht_status"); //wasted //normal //obese
+            $table->string("weight_for_age")->nullable(); //underweight //normal //overweight
+            $table->string("height_for_age")->nullable(); //stunted //normal //tall
+            $table->string("weight_for_ltht_status")->nullable(); //wasted //normal //obese
+            $table->string("bmi_for_age")->nullable();
+            $table->string("bmi")->nullable();
 
             $table->text("immunizations")->nullable();
             $table->date("last_deworming_date")->nullable();
