@@ -14,7 +14,11 @@ return new class extends Migration
         Schema::create('patients', function (Blueprint $table) {
             $table->id();
             $table->string("name");
-            $table->string("address");
+            $table->foreignId('barangay_id')
+                ->nullable()
+                ->constrained('barangays')
+                ->nullOnDelete();
+            $table->string("address")->nullable();
             $table->string("sex");
             $table->date("birthday");
             $table->string("contact_number");

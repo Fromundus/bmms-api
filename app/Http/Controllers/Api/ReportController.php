@@ -74,47 +74,130 @@ class ReportController extends Controller
     //     return response()->json(['error' => 'Invalid export type'], 400);
     // }
 
+    // public function export(Request $request, $type)
+    // {
+    //     $from = $request->query('from_date');
+    //     $to   = $request->query('to_date');
+
+    //     $role = auth()->user()->role;
+
+    //     $query = PatientRecord::with('patient')
+    //         ->whereIn('id', function ($sub) use ($from, $to, $role) {
+    //             $sub->selectRaw('MAX(id)')
+    //                 ->from('patient_records as pr2')
+
+    //                 // 🔐 Role-based age filter
+    //                 ->when($role === 'bns', function ($q) {
+    //                     $q->where('age', '<', 20);
+    //                 })
+    //                 ->when($role === 'bhw', function ($q) {
+    //                     $q->where('age', '>=', 20);
+    //                 })
+
+    //                 // 📅 Date filter
+    //                 ->when($from && $to, function ($q) use ($from, $to) {
+    //                     $q->whereBetween('date_measured', [$from, $to]);
+    //                 })
+
+    //                 ->groupBy('patient_id');
+    //         });
+
+    //     $records = $query->orderBy('date_measured', 'desc')->get();
+
+    //     if ($type === 'excel') {
+    //         return Excel::download(new PatientRecordsExport($records), 'patients.xlsx');
+    //     }
+
+    //     if ($type === 'pdf') {
+    //         $pdf = Pdf::loadView('reports.patients', ['records' => $records]);
+    //         return $pdf->download('patients.pdf');
+    //     }
+
+    //     return response()->json(['error' => 'Invalid export type'], 400);
+    // }
+
     public function export(Request $request, $type)
-    {
-        $from = $request->query('from_date');
-        $to   = $request->query('to_date');
+{
+    $from = $request->query('from_date');
+    $to   = $request->query('to_date');
 
-        $role = auth()->user()->role;
+    $user = auth()->user();
+    $role = $user->role;
 
-        $query = PatientRecord::with('patient')
-            ->whereIn('id', function ($sub) use ($from, $to, $role) {
-                $sub->selectRaw('MAX(id)')
-                    ->from('patient_records as pr2')
+    $query = PatientRecord::with('patient')
 
-                    // 🔐 Role-based age filter
-                    ->when($role === 'bns', function ($q) {
-                        $q->where('age', '<', 20);
-                    })
-                    ->when($role === 'bhw', function ($q) {
-                        $q->where('age', '>=', 20);
-                    })
-
-                    // 📅 Date filter
-                    ->when($from && $to, function ($q) use ($from, $to) {
-                        $q->whereBetween('date_measured', [$from, $to]);
-                    })
-
-                    ->groupBy('patient_id');
+        // 🏘️ Only filter by barangay if the user has a barangay_id
+        ->when($user->barangay_id, function ($q) use ($user) {
+            $q->whereHas('patient', function ($patientQuery) use ($user) {
+                $patientQuery->where(
+                    'patients.barangay_id',
+                    $user->barangay_id
+                );
             });
+        })
 
-        $records = $query->orderBy('date_measured', 'desc')->get();
+        // Latest record per patient
+        ->whereIn('patient_records.id', function ($sub) use (
+            $from,
+            $to,
+            $role,
+            $user
+        ) {
+            $sub->selectRaw('MAX(pr2.id)')
+                ->from('patient_records as pr2')
+                ->join('patients as p', 'p.id', '=', 'pr2.patient_id')
 
-        if ($type === 'excel') {
-            return Excel::download(new PatientRecordsExport($records), 'patients.xlsx');
-        }
+                // 🏘️ Apply barangay filter ONLY if user has one
+                ->when($user->barangay_id, function ($q) use ($user) {
+                    $q->where(
+                        'p.barangay_id',
+                        $user->barangay_id
+                    );
+                })
 
-        if ($type === 'pdf') {
-            $pdf = Pdf::loadView('reports.patients', ['records' => $records]);
-            return $pdf->download('patients.pdf');
-        }
+                // 🔐 Role-based age filter
+                ->when($role === 'bns', function ($q) {
+                    $q->where('pr2.age', '<', 20);
+                })
 
-        return response()->json(['error' => 'Invalid export type'], 400);
+                ->when($role === 'bhw', function ($q) {
+                    $q->where('pr2.age', '>=', 20);
+                })
+
+                // 📅 Date filter
+                ->when($from && $to, function ($q) use ($from, $to) {
+                    $q->whereBetween(
+                        'pr2.date_measured',
+                        [$from, $to]
+                    );
+                })
+
+                ->groupBy('pr2.patient_id');
+        });
+
+    $records = $query
+        ->orderBy('patient_records.date_measured', 'desc')
+        ->get();
+
+    if ($type === 'excel') {
+        return Excel::download(
+            new PatientRecordsExport($records),
+            'patients.xlsx'
+        );
     }
+
+    if ($type === 'pdf') {
+        $pdf = Pdf::loadView('reports.patients', [
+            'records' => $records,
+        ]);
+
+        return $pdf->download('patients.pdf');
+    }
+
+    return response()->json([
+        'error' => 'Invalid export type'
+    ], 400);
+}
 
     // public function generateReport()
     // {

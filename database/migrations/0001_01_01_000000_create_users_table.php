@@ -22,6 +22,10 @@ return new class extends Migration
             $table->string('password');
             $table->string('role')->default('user');
             $table->string("status")->default("active");
+            $table->foreignId('barangay_id')
+                ->nullable()
+                ->constrained('barangays')
+                ->nullOnDelete();
             $table->rememberToken();
             $table->timestamps();
         });

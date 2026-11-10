@@ -28,6 +28,7 @@ class User extends Authenticatable
         'role',
         'password',
         'status',
+        'barangay_id',
     ];
 
     /**
@@ -56,4 +57,9 @@ class User extends Authenticatable
     // public function activityLogs(){
     //     return $this->hasMany(ActivityLog::class);
     // }
+
+    public function barangay()
+    {
+        return $this->belongsTo(Barangay::class);
+    }
 }

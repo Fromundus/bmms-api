@@ -4,6 +4,7 @@ use App\Exports\PatientsExport;
 use App\Exports\RegisteredMembersExport;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BarangayController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PatientController;
@@ -45,6 +46,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function(){
         });
 
         Route::get('/getStats', [PatientController::class, 'getStats']);
+        Route::get('/barangay-stats', [PatientController::class, 'getStatsByBarangay']);
 
         Route::prefix('/patients')->group(function(){
             Route::get('/', [PatientController::class, 'index']);
@@ -82,6 +84,7 @@ Route::get('/notifications', [NotificationController::class, 'index']);
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
+Route::get('/barangays', [BarangayController::class, 'index']);
 
 Route::get('/test', function(){
     return response()->json([

@@ -15,23 +15,25 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 class PatientController extends Controller
 {
-    public function getStats()
+    public function getStats(Request $request)
     {
         $role = auth()->user()->role;
+
+        $auth = $request->user();
 
         $query = Patient::with('latestRecord');
 
         // 🔐 Apply role-based age filter
         if ($role === 'bns') {
             // 20 years old and below
-            $query->whereHas('latestRecord', function ($q) {
+            $query->where('barangay_id', $auth->barangay_id)->whereHas('latestRecord', function ($q) {
                 $q->where('age', '<', 20);
             });
         }
 
         if ($role === 'bhw') {
             // 21 years old and above
-            $query->whereHas('latestRecord', function ($q) {
+            $query->where('barangay_id', $auth->barangay_id)->whereHas('latestRecord', function ($q) {
                 $q->where('age', '>=', 20);
             });
         }
@@ -70,6 +72,104 @@ class PatientController extends Controller
         ]);
     }
 
+    public function getStatsByBarangay(Request $request)
+    {
+        $user = $request->user();
+        $role = $user->role;
+
+        $query = Patient::with([
+            'barangay:id,name',
+            'latestRecord'
+        ]);
+
+        // Barangay filter
+        if ($user->barangay_id !== null) {
+            $query->where('barangay_id', $user->barangay_id);
+        }
+
+        // Role-based age filter
+        if ($role === 'bns') {
+            $query->whereHas('latestRecord', function ($q) {
+                $q->where('age', '<', 20);
+            });
+        }
+
+        if ($role === 'bhw') {
+            $query->whereHas('latestRecord', function ($q) {
+                $q->where('age', '>=', 20);
+            });
+        }
+
+        // Get patients
+        $patients = $query->get();
+
+        // Group patients by barangay
+        $grouped = $patients->groupBy(function ($patient) {
+            return $patient->barangay_id ?? 'unassigned';
+        });
+
+        $barangayStats = $grouped->map(function ($patients, $barangayId) {
+
+            $total = $patients->count();
+
+            $counts = [
+                'Severe'   => 0,
+                'Moderate' => 0,
+                'At Risk'  => 0,
+                'Healthy'  => 0,
+            ];
+
+            foreach ($patients as $patient) {
+                $status = $patient->latestRecord?->status;
+
+                if ($status && isset($counts[$status])) {
+                    $counts[$status]++;
+                }
+            }
+
+            $percent = fn($count) => $total > 0
+                ? round(($count / $total) * 100, 2)
+                : 0;
+
+            return [
+                'barangay_id' => $barangayId === 'unassigned'
+                    ? null
+                    : $barangayId,
+
+                'barangay_name' => $patients->first()->barangay?->name
+                    ?? 'Unassigned',
+
+                'total_patients' => $total,
+
+                'severe' => [
+                    'count' => $counts['Severe'],
+                    'percent' => $percent($counts['Severe']),
+                ],
+
+                'moderate' => [
+                    'count' => $counts['Moderate'],
+                    'percent' => $percent($counts['Moderate']),
+                ],
+
+                'at_risk' => [
+                    'count' => $counts['At Risk'],
+                    'percent' => $percent($counts['At Risk']),
+                ],
+
+                'healthy' => [
+                    'count' => $counts['Healthy'],
+                    'percent' => $percent($counts['Healthy']),
+                ],
+            ];
+        })->values();
+
+        return response()->json([
+            'total_barangays' => $barangayStats->count(),
+            'total_patients' => $patients->count(),
+            'barangays' => $barangayStats,
+        ]);
+    }
+
     public function index(Request $request)
     {
         $search = $request->query('search');
@@ -80,20 +180,22 @@ class PatientController extends Controller
         $wfltht = $request->query('wfltht');
         $status = $request->query('status');
 
-        $query = Patient::query()->with("latestRecord");
+        $query = Patient::query()->with(["latestRecord", "barangay"]);
 
         $role = auth()->user()->role;
 
+        $auth = $request->user();
+
         if ($role === 'bns') {
             // 20 years old and below
-            $query->whereHas('latestRecord', function ($q) {
+            $query->where('barangay_id', $auth->barangay_id)->whereHas('latestRecord', function ($q) {
                 $q->where('age', '<', 20);
             });
         }
 
         if ($role === 'bhw') {
             // 21 years old and above
-            $query->whereHas('latestRecord', function ($q) {
+            $query->where('barangay_id', $auth->barangay_id)->whereHas('latestRecord', function ($q) {
                 $q->where('age', '>=', 20);
             });
         }
@@ -157,7 +259,8 @@ class PatientController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string',
-            'address' => 'required|string',
+            'barangay_id' => 'required',
+            // 'address' => 'required|string',
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
             'contact_number' => 'required|string|min:11|max:11',
@@ -214,7 +317,8 @@ class PatientController extends Controller
 
         $patient = Patient::create(attributes: [
             'name' => $validated["name"],
-            'address' => $validated["address"],
+            // 'address' => $validated["address"],
+            'barangay_id' => $validated["barangay_id"],
             'sex' => $validated["sex"],
             'birthday' => $validated["birthday"],
             'contact_number' => $validated["contact_number"],
@@ -298,7 +402,8 @@ class PatientController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string',
-            'address' => 'required|string',
+            'barangay_id' => 'required',
+            // 'address' => 'required|string',
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
             'contact_number' => 'required|string|min:11|max:11',
@@ -328,7 +433,8 @@ class PatientController extends Controller
 
         $patient->update([
             'name' => $validated["name"],
-            'address' => $validated["address"],
+            // 'address' => $validated["address"],
+            'barangay_id' => $validated["barangay_id"],
             'sex' => $validated["sex"],
             'birthday' => $validated["birthday"],
             'contact_number' => $validated["contact_number"],

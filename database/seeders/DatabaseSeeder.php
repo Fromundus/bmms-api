@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolePermissionSeeder::class,
+            BarangaySeeder::class,
         ]);
 
         // User::factory(10)->create();
@@ -36,6 +37,7 @@ class DatabaseSeeder extends Seeder
             'name' => 'Barangay Nutrition Scholar',
             'contact_number' => '09123456789',
             'email' => 'bns@test.com',
+            'barangay_id' => 11,
             'area' => 'Purok 1',
             'notes' => 'lorem ipsum',
             'password' => Hash::make("1234"),
@@ -48,6 +50,7 @@ class DatabaseSeeder extends Seeder
             'name' => 'Barangay Health Worker',
             'contact_number' => '09987654321',
             'email' => 'bhw@test.com',
+            'barangay_id' => 11,
             'area' => 'Purok 1',
             'notes' => 'lorem ipsum',
             'password' => Hash::make("1234"),

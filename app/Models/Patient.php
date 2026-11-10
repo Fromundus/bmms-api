@@ -30,6 +30,8 @@ class Patient extends Model
         "notes",
 
         "status",
+
+        "barangay_id",
     ];
 
     public function records(){
@@ -46,6 +48,11 @@ class Patient extends Model
         return $this->hasOne(PatientRecord::class)
             ->whereBetween('date_measured', [$from, $to])
             ->latestOfMany('date_measured');
+    }
+
+    public function barangay()
+    {
+        return $this->belongsTo(Barangay::class);
     }
 
 }

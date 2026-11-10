@@ -28,13 +28,16 @@ class PatientSeeder extends Seeder
             $sex = $faker->randomElement(['Male', 'Female']);
             $birthday = $birthday->format('Y-m-d');
 
+            $barangayId = DB::table('barangays')->inRandomOrder()->value('id');
+
             // 1️⃣ Insert patient
             $patientId = DB::table('patients')->insertGetId([
                 'name'            => $faker->name,
-                'address'         => $faker->address,
+                // 'address'         => $faker->address,
                 'sex'             => $sex,
                 'birthday'        => $birthday,
                 'contact_number'  => $faker->phoneNumber,
+                'barangay_id'    => $barangayId,
                 'created_at'      => now(),
                 'updated_at'      => now(),
             ]);

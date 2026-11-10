@@ -20,7 +20,7 @@ class UserController extends Controller
         $role = $request->query('role');
         $status = $request->query('status'); // "active" or "inactive"
 
-        $query = User::query();
+        $query = User::query()->with('barangay');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -50,7 +50,7 @@ class UserController extends Controller
         if($auth->role == "admin"){
             $users = $query->where("role", "bns")->orWhere("role", 'bhw')->orderBy('id', 'desc')->paginate($perPage);
         } else if ($auth->role == "bhw"){
-            $users = $query->where("role", "bns")->orderBy('id', 'desc')->paginate($perPage);
+            $users = $query->where("role", "bns")->where('barangay_id', $auth->barangay_id)->orderBy('id', 'desc')->paginate($perPage);
         }
 
 
