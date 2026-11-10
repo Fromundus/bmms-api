@@ -34,6 +34,13 @@ class Summary extends Model
         'adult_moderate',
         'adult_severe',
 
+        // Pregnant
+        'pregnant_total',
+        'pregnant_healthy',
+        'pregnant_at_risk',
+        'pregnant_moderate',
+        'pregnant_severe',
+
         // DSS
         'remark',
         'recommendations',
