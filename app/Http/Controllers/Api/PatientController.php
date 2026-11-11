@@ -244,7 +244,7 @@ class PatientController extends Controller
     }
 
     public function show($id){
-        $patient = Patient::with("latestRecord")->findOrFail($id);
+        $patient = Patient::with(["latestRecord", "barangay"])->findOrFail($id);
 
         return response()->json($patient);
     }
@@ -260,7 +260,7 @@ class PatientController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'barangay_id' => 'required',
-            // 'address' => 'required|string',
+            'address' => 'required|string',
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
             'contact_number' => 'required|string|min:11|max:11',
@@ -317,7 +317,7 @@ class PatientController extends Controller
 
         $patient = Patient::create(attributes: [
             'name' => $validated["name"],
-            // 'address' => $validated["address"],
+            'address' => $validated["address"],
             'barangay_id' => $validated["barangay_id"],
             'sex' => $validated["sex"],
             'birthday' => $validated["birthday"],
@@ -403,7 +403,7 @@ class PatientController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'barangay_id' => 'required',
-            // 'address' => 'required|string',
+            'address' => 'required|string',
             'sex' => 'required|string|in:Male,Female',
             'birthday' => 'required|date',
             'contact_number' => 'required|string|min:11|max:11',
@@ -433,7 +433,7 @@ class PatientController extends Controller
 
         $patient->update([
             'name' => $validated["name"],
-            // 'address' => $validated["address"],
+            'address' => $validated["address"],
             'barangay_id' => $validated["barangay_id"],
             'sex' => $validated["sex"],
             'birthday' => $validated["birthday"],

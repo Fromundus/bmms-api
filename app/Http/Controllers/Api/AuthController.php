@@ -20,7 +20,7 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email',
             'contact_number' => 'required|string|unique:users,contact_number|min:11|max:11',
             'barangay_id' => 'required',
-            'area' => 'required|string|max:255',
+            // 'area' => 'required|string|max:255',
             'password' => 'required|confirmed|string|min:4',
             'role' => 'required|string',
         ]);
@@ -30,11 +30,13 @@ class AuthController extends Controller
             'email' => $data["email"],
             'contact_number' => $data["contact_number"],
             'barangay_id' => $data["barangay_id"],
-            'area' => $data["area"],
+            // 'area' => $data["area"],
             'password' => Hash::make($data["password"]),
             'role' => $data["role"],
             'status' => 'pending',
         ]);
+
+        $user->assignRole($data['role']);
 
         return response()->json($user, 201);
     }
