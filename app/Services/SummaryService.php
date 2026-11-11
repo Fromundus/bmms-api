@@ -39,22 +39,44 @@ class SummaryService
         |--------------------------------------------------------------------------
         */
 
-        // Pregnant women are identified first, regardless of age.
         $pregnantWomen = $latestRecords->filter(
             fn ($r) => (int) $r->is_pregnant === 1
         );
 
-        // Children who are not pregnant.
         $children = $latestRecords->filter(
-            fn ($r) => (int) $r->age < 20 &&
-                       (int) $r->is_pregnant !== 1
+            fn ($r) =>
+                (int) $r->age < 20 &&
+                (int) $r->is_pregnant !== 1
         );
 
-        // Adults who are not pregnant.
         $adults = $latestRecords->filter(
-            fn ($r) => (int) $r->age >= 20 &&
-                       (int) $r->is_pregnant !== 1
+            fn ($r) =>
+                (int) $r->age >= 20 &&
+                (int) $r->is_pregnant !== 1
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | NORMALIZE STATUS
+        |--------------------------------------------------------------------------
+        |
+        | This makes the report more reliable if the database stores values such
+        | as "At Risk", "at_risk", "Severe", etc.
+        |
+        */
+
+        $normalizeStatus = function ($status) {
+            $status = strtolower(trim((string) $status));
+            $status = str_replace([' ', '-'], '_', $status);
+
+            return match ($status) {
+                'healthy', 'normal' => 'healthy',
+                'at_risk', 'risk', 'at_risk_status' => 'at_risk',
+                'moderate', 'moderately_malnourished' => 'moderate',
+                'severe', 'severely_malnourished' => 'severe',
+                default => null,
+            };
+        };
 
         /*
         |--------------------------------------------------------------------------
@@ -62,7 +84,7 @@ class SummaryService
         |--------------------------------------------------------------------------
         */
 
-        $countStatuses = function ($records) {
+        $countStatuses = function ($records) use ($normalizeStatus) {
             $counts = [
                 'healthy' => 0,
                 'at_risk' => 0,
@@ -71,11 +93,9 @@ class SummaryService
             ];
 
             foreach ($records as $r) {
-                $status = strtolower(trim((string) $r->status));
+                $status = $normalizeStatus($r->status);
 
-                $status = str_replace(' ', '_', $status);
-
-                if (array_key_exists($status, $counts)) {
+                if ($status !== null) {
                     $counts[$status]++;
                 }
             }
@@ -85,7 +105,7 @@ class SummaryService
 
         /*
         |--------------------------------------------------------------------------
-        | CHILDREN (0-19)
+        | CHILDREN (0–19)
         |--------------------------------------------------------------------------
         */
 
@@ -99,23 +119,66 @@ class SummaryService
         ], $countStatuses($children));
 
         foreach ($children as $r) {
-            if (str_contains((string) $r->weight_for_age, 'Underweight')) {
+
+            /*
+            | Underweight
+            */
+            if (
+                str_contains(
+                    strtolower((string) $r->weight_for_age),
+                    'underweight'
+                )
+            ) {
                 $child['underweight']++;
             }
 
-            if (str_contains((string) $r->height_for_age, 'Stunted')) {
+            /*
+            | Stunting
+            */
+            if (
+                str_contains(
+                    strtolower((string) $r->height_for_age),
+                    'stunt'
+                )
+            ) {
                 $child['stunted']++;
             }
 
-            if (str_contains((string) $r->weight_for_ltht_status, 'Wasted')) {
+            /*
+            | Wasting
+            */
+            if (
+                str_contains(
+                    strtolower((string) $r->weight_for_ltht_status),
+                    'wast'
+                )
+            ) {
                 $child['wasted']++;
             }
 
-            if ($r->weight_for_ltht_status === 'Overweight') {
+            /*
+            | Overweight
+            */
+            if (
+                str_contains(
+                    strtolower((string) $r->weight_for_ltht_status),
+                    'overweight'
+                )
+            ) {
                 $child['overweight']++;
             }
 
-            if ($r->weight_for_ltht_status === 'Obese') {
+            /*
+            | Obesity
+            |
+            | Supports both "Obese" and "Obesity" values.
+            */
+            if (
+                str_contains(
+                    strtolower((string) $r->weight_for_ltht_status),
+                    'obes'
+                )
+            ) {
                 $child['obese']++;
             }
         }
@@ -134,15 +197,37 @@ class SummaryService
         ], $countStatuses($adults));
 
         foreach ($adults as $r) {
-            if (str_contains((string) $r->weight_for_ltht_status, 'Wasted')) {
+
+            $nutritionStatus = strtolower(
+                trim((string) $r->weight_for_ltht_status)
+            );
+
+            /*
+            | Undernutrition
+            */
+            if (
+                str_contains($nutritionStatus, 'wast') ||
+                str_contains($nutritionStatus, 'underweight') ||
+                str_contains($nutritionStatus, 'thin')
+            ) {
                 $adult['wasted']++;
             }
 
-            if ($r->weight_for_ltht_status === 'Overweight') {
+            /*
+            | Overweight
+            */
+            if (
+                str_contains($nutritionStatus, 'overweight')
+            ) {
                 $adult['overweight']++;
             }
 
-            if ($r->weight_for_ltht_status === 'Obese') {
+            /*
+            | Obesity
+            */
+            if (
+                str_contains($nutritionStatus, 'obes')
+            ) {
                 $adult['obese']++;
             }
         }
@@ -167,11 +252,79 @@ class SummaryService
 
         /*
         |--------------------------------------------------------------------------
-        | DSS RECOMMENDATIONS
+        | POPULATION-WIDE STATUS TOTALS
+        |--------------------------------------------------------------------------
+        |
+        | This is the important correction.
+        |
+        | Instead of looking only at a few selected groups, calculate how many
+        | people in the ENTIRE barangay are Healthy, At Risk, Moderate, or Severe.
+        |
+        */
+
+        $populationStatus = [
+            'total' => $total,
+            'healthy' =>
+                $child['healthy'] +
+                $adult['healthy'] +
+                $pregnant['healthy'],
+
+            'at_risk' =>
+                $child['at_risk'] +
+                $adult['at_risk'] +
+                $pregnant['at_risk'],
+
+            'moderate' =>
+                $child['moderate'] +
+                $adult['moderate'] +
+                $pregnant['moderate'],
+
+            'severe' =>
+                $child['severe'] +
+                $adult['severe'] +
+                $pregnant['severe'],
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | CALCULATE STATUS RATES
         |--------------------------------------------------------------------------
         */
 
-        $recommendations = [];
+        $healthyRate = $total > 0
+            ? $populationStatus['healthy'] / $total
+            : 0;
+
+        $atRiskRate = $total > 0
+            ? $populationStatus['at_risk'] / $total
+            : 0;
+
+        $moderateRate = $total > 0
+            ? $populationStatus['moderate'] / $total
+            : 0;
+
+        $severeRate = $total > 0
+            ? $populationStatus['severe'] / $total
+            : 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL CONCERNED POPULATION
+        |--------------------------------------------------------------------------
+        |
+        | Anyone who is At Risk, Moderate, or Severe is considered part of the
+        | population requiring some level of nutrition attention.
+        |
+        */
+
+        $concernedPopulation =
+            $populationStatus['at_risk'] +
+            $populationStatus['moderate'] +
+            $populationStatus['severe'];
+
+        $concernedRate = $total > 0
+            ? $concernedPopulation / $total
+            : 0;
 
         /*
         |--------------------------------------------------------------------------
@@ -179,70 +332,30 @@ class SummaryService
         |--------------------------------------------------------------------------
         */
 
-        $childMalnutritionRate = $child['total'] > 0
-            ? (
-                $child['underweight'] +
-                $child['stunted'] +
-                $child['wasted']
-            ) / $child['total']
+        /*
+        | These indicator rates are still useful for recommendations.
+        | They should not be the only basis of the overall barangay remark.
+        */
+
+        $childUnderweightRate = $child['total'] > 0
+            ? $child['underweight'] / $child['total']
+            : 0;
+
+        $childStuntingRate = $child['total'] > 0
+            ? $child['stunted'] / $child['total']
+            : 0;
+
+        $childWastingRate = $child['total'] > 0
+            ? $child['wasted'] / $child['total']
+            : 0;
+
+        $childObesityRate = $child['total'] > 0
+            ? $child['obese'] / $child['total']
             : 0;
 
         $childSevereRate = $child['total'] > 0
             ? $child['severe'] / $child['total']
             : 0;
-
-        if ($childMalnutritionRate > 0.30) {
-            $recommendations[] = [
-                'group' => 'Children',
-                'priority' => 'critical',
-                'message' => 'Severe child malnutrition crisis detected',
-                'actions' => [
-                    'Emergency feeding programs',
-                    'Nutritional supplementation (vitamins, iron)',
-                    'Household-level intervention',
-                    'Medical screening for severe cases',
-                ],
-            ];
-        } elseif ($childMalnutritionRate > 0.15) {
-            $recommendations[] = [
-                'group' => 'Children',
-                'priority' => 'high',
-                'message' => 'Moderate child malnutrition levels',
-                'actions' => [
-                    'Barangay feeding programs',
-                    'Parent nutrition seminars',
-                    'Growth monitoring campaigns',
-                ],
-            ];
-        }
-
-        if ($child['total'] > 0 &&
-            $child['stunted'] > ($child['total'] * 0.25)) {
-            $recommendations[] = [
-                'group' => 'Children',
-                'priority' => 'high',
-                'message' => 'High stunting prevalence',
-                'actions' => [
-                    'Long-term nutrition programs',
-                    'Maternal health education',
-                    'Early childhood intervention',
-                ],
-            ];
-        }
-
-        if ($child['total'] > 0 &&
-            $child['obese'] > ($child['total'] * 0.10)) {
-            $recommendations[] = [
-                'group' => 'Children',
-                'priority' => 'medium',
-                'message' => 'Increasing childhood obesity',
-                'actions' => [
-                    'Promote physical activity in schools',
-                    'Healthy eating campaigns',
-                    'Reduce sugary food consumption',
-                ],
-            ];
-        }
 
         /*
         |--------------------------------------------------------------------------
@@ -254,60 +367,13 @@ class SummaryService
             ? $adult['obese'] / $adult['total']
             : 0;
 
+        $adultUndernutritionRate = $adult['total'] > 0
+            ? $adult['wasted'] / $adult['total']
+            : 0;
+
         $adultSevereRate = $adult['total'] > 0
             ? $adult['severe'] / $adult['total']
             : 0;
-
-        if ($adultObesityRate > 0.25) {
-            $recommendations[] = [
-                'group' => 'Adults',
-                'priority' => 'high',
-                'message' => 'High adult obesity rate',
-                'actions' => [
-                    'Community fitness programs',
-                    'Diet monitoring initiatives',
-                    'Workplace wellness campaigns',
-                ],
-            ];
-        } elseif ($adultObesityRate > 0.15) {
-            $recommendations[] = [
-                'group' => 'Adults',
-                'priority' => 'medium',
-                'message' => 'Rising obesity cases',
-                'actions' => [
-                    'Exercise programs',
-                    'Diet awareness campaigns',
-                ],
-            ];
-        }
-
-        if ($adult['total'] > 0 &&
-            $adult['wasted'] > ($adult['total'] * 0.10)) {
-            $recommendations[] = [
-                'group' => 'Adults',
-                'priority' => 'medium',
-                'message' => 'Adult undernutrition detected',
-                'actions' => [
-                    'Food assistance programs',
-                    'Nutritional counseling',
-                    'Health check-ups',
-                ],
-            ];
-        }
-
-        if ($adult['total'] > 0 &&
-            $adult['at_risk'] > ($adult['total'] * 0.20)) {
-            $recommendations[] = [
-                'group' => 'Adults',
-                'priority' => 'low',
-                'message' => 'Large at-risk population',
-                'actions' => [
-                    'Preventive health education',
-                    'Regular BMI monitoring',
-                    'Lifestyle awareness programs',
-                ],
-            ];
-        }
 
         /*
         |--------------------------------------------------------------------------
@@ -323,7 +389,200 @@ class SummaryService
             ? $pregnant['severe'] / $pregnant['total']
             : 0;
 
+        /*
+        |--------------------------------------------------------------------------
+        | DSS RECOMMENDATIONS
+        |--------------------------------------------------------------------------
+        */
+
+        $recommendations = [];
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHILDREN RECOMMENDATIONS
+        |--------------------------------------------------------------------------
+        */
+
+        if ($child['total'] > 0 && $childSevereRate >= 0.10) {
+
+            $recommendations[] = [
+                'group' => 'Children',
+                'priority' => 'critical',
+                'message' => 'High proportion of children with severe nutritional status',
+                'actions' => [
+                    'Prioritize assessment and follow-up of children with severe status',
+                    'Strengthen growth monitoring',
+                    'Conduct targeted nutrition interventions',
+                    'Coordinate identified cases with qualified healthcare personnel',
+                ],
+            ];
+
+        } elseif ($child['total'] > 0 && $childSevereRate > 0) {
+
+            $recommendations[] = [
+                'group' => 'Children',
+                'priority' => 'high',
+                'message' => 'Children with severe nutritional status detected',
+                'actions' => [
+                    'Prioritize follow-up of identified severe cases',
+                    'Continue regular growth monitoring',
+                    'Provide appropriate nutrition counseling',
+                ],
+            ];
+        }
+
+        if ($childUnderweightRate >= 0.30) {
+
+            $recommendations[] = [
+                'group' => 'Children',
+                'priority' => 'critical',
+                'message' => 'High prevalence of underweight children',
+                'actions' => [
+                    'Strengthen targeted nutrition programs',
+                    'Conduct household-level follow-up',
+                    'Provide nutrition counseling',
+                    'Review children with persistent growth concerns',
+                ],
+            ];
+
+        } elseif ($childUnderweightRate >= 0.15) {
+
+            $recommendations[] = [
+                'group' => 'Children',
+                'priority' => 'high',
+                'message' => 'Moderate prevalence of underweight children',
+                'actions' => [
+                    'Strengthen barangay nutrition programs',
+                    'Conduct parent nutrition education',
+                    'Increase growth monitoring activities',
+                ],
+            ];
+        }
+
+        if ($childStuntingRate >= 0.25) {
+
+            $recommendations[] = [
+                'group' => 'Children',
+                'priority' => 'high',
+                'message' => 'High stunting prevalence among children',
+                'actions' => [
+                    'Strengthen long-term nutrition programs',
+                    'Support maternal and child nutrition education',
+                    'Promote early childhood nutrition interventions',
+                ],
+            ];
+        }
+
+        if ($childWastingRate >= 0.10) {
+
+            $recommendations[] = [
+                'group' => 'Children',
+                'priority' => 'high',
+                'message' => 'Wasting detected among children',
+                'actions' => [
+                    'Identify and follow up affected children',
+                    'Strengthen nutrition screening',
+                    'Provide appropriate nutrition counseling and referral',
+                ],
+            ];
+        }
+
+        if ($childObesityRate >= 0.10) {
+
+            $recommendations[] = [
+                'group' => 'Children',
+                'priority' => 'medium',
+                'message' => 'Increasing childhood overweight or obesity',
+                'actions' => [
+                    'Promote age-appropriate physical activity',
+                    'Strengthen healthy eating education',
+                    'Reduce frequent consumption of sugary and highly processed foods',
+                ],
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADULT RECOMMENDATIONS
+        |--------------------------------------------------------------------------
+        */
+
+        if ($adultSevereRate >= 0.10) {
+
+            $recommendations[] = [
+                'group' => 'Adults',
+                'priority' => 'critical',
+                'message' => 'High proportion of adults with severe nutritional status',
+                'actions' => [
+                    'Prioritize assessment of identified severe cases',
+                    'Strengthen health and nutrition follow-up',
+                    'Coordinate with healthcare providers',
+                ],
+            ];
+
+        } elseif ($adultSevereRate > 0) {
+
+            $recommendations[] = [
+                'group' => 'Adults',
+                'priority' => 'high',
+                'message' => 'Adults with severe nutritional status detected',
+                'actions' => [
+                    'Follow up identified severe cases',
+                    'Provide nutrition counseling',
+                    'Conduct appropriate health assessment',
+                ],
+            ];
+        }
+
+        if ($adultObesityRate >= 0.25) {
+
+            $recommendations[] = [
+                'group' => 'Adults',
+                'priority' => 'high',
+                'message' => 'High adult obesity prevalence',
+                'actions' => [
+                    'Promote community physical activity',
+                    'Strengthen healthy diet education',
+                    'Support lifestyle and weight management initiatives',
+                ],
+            ];
+
+        } elseif ($adultObesityRate >= 0.15) {
+
+            $recommendations[] = [
+                'group' => 'Adults',
+                'priority' => 'medium',
+                'message' => 'Elevated adult obesity prevalence',
+                'actions' => [
+                    'Promote regular physical activity',
+                    'Provide healthy lifestyle education',
+                    'Encourage regular nutrition and health monitoring',
+                ],
+            ];
+        }
+
+        if ($adultUndernutritionRate >= 0.10) {
+
+            $recommendations[] = [
+                'group' => 'Adults',
+                'priority' => 'medium',
+                'message' => 'Adult undernutrition detected',
+                'actions' => [
+                    'Provide nutrition counseling',
+                    'Assess possible contributing factors',
+                    'Encourage appropriate health follow-up',
+                ],
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PREGNANT WOMEN RECOMMENDATIONS
+        |--------------------------------------------------------------------------
+        */
+
         if ($pregnant['total'] > 0 && $pregnant['severe'] > 0) {
+
             $recommendations[] = [
                 'group' => 'Pregnant Women',
                 'priority' => 'critical',
@@ -337,7 +596,8 @@ class SummaryService
             ];
         }
 
-        if ($pregnantRiskRate > 0.20) {
+        if ($pregnantRiskRate >= 0.20) {
+
             $recommendations[] = [
                 'group' => 'Pregnant Women',
                 'priority' => 'high',
@@ -351,29 +611,132 @@ class SummaryService
             ];
         }
 
+        // /*
+        // |--------------------------------------------------------------------------
+        // | POPULATION-WIDE RECOMMENDATIONS
+        // |--------------------------------------------------------------------------
+        // */
+
+        // if ($total > 0 && $severeRate >= 0.10) {
+
+        //     $recommendations[] = [
+        //         'group' => 'Barangay',
+        //         'priority' => 'critical',
+        //         'message' => 'High proportion of the assessed population has severe nutritional status',
+        //         'actions' => [
+        //             'Prioritize severe cases for follow-up',
+        //             'Coordinate targeted nutrition interventions',
+        //             'Strengthen case monitoring and referral',
+        //             'Review barangay nutrition response capacity',
+        //         ],
+        //     ];
+
+        // } elseif ($total > 0 && $severeRate > 0) {
+
+        //     $recommendations[] = [
+        //         'group' => 'Barangay',
+        //         'priority' => 'high',
+        //         'message' => 'Severe nutritional cases are present in the assessed population',
+        //         'actions' => [
+        //             'Prioritize follow-up of severe cases',
+        //             'Strengthen nutrition monitoring',
+        //             'Coordinate appropriate referrals',
+        //         ],
+        //     ];
+        // }
+
+        // if ($total > 0 && $concernedRate >= 0.40) {
+
+        //     $recommendations[] = [
+        //         'group' => 'Barangay',
+        //         'priority' => 'high',
+        //         'message' => 'A large proportion of the assessed population requires nutrition attention',
+        //         'actions' => [
+        //             'Strengthen barangay-wide nutrition programs',
+        //             'Increase follow-up and monitoring',
+        //             'Prioritize high-risk households and individuals',
+        //         ],
+        //     ];
+        // }
+
         /*
         |--------------------------------------------------------------------------
-        | SMART REMARK SYSTEM
+        | IMPROVED SMART REMARK SYSTEM
         |--------------------------------------------------------------------------
+        |
+        | The remark now directly reflects:
+        |
+        | 1. Severe population
+        | 2. Moderate population
+        | 3. At-risk population
+        | 4. Total population requiring attention
+        |
+        | Severe cases have the highest priority.
+        | A barangay with severe cases should not simply be called "stable".
+        |
         */
 
-        $riskScore = 0;
+        if ($total === 0) {
 
-        $riskScore += $childMalnutritionRate * 50;
-        $riskScore += $adultObesityRate * 30;
-        $riskScore += $adultSevereRate * 20;
+            $remark = 'No patient records are available for the selected reporting period.';
 
-        // Include pregnant women's severe-status rate.
-        $riskScore += $pregnantSevereRate * 20;
+        } elseif ($populationStatus['severe'] > 0 && $severeRate >= 0.20) {
 
-        if ($riskScore >= 50) {
-            $remark = 'Critical nutrition situation. Immediate intervention required.';
-        } elseif ($riskScore >= 30) {
-            $remark = 'Moderate nutrition risk. Strengthen barangay programs.';
-        } elseif ($riskScore >= 15) {
-            $remark = 'Mild nutrition concerns detected. Preventive actions recommended.';
+            $remark = sprintf(
+                'Critical nutrition situation: %d of %d assessed individuals (%.1f%%) have severe nutritional status. Immediate targeted intervention and follow-up are recommended.',
+                $populationStatus['severe'],
+                $total,
+                $severeRate * 100
+            );
+
+        } elseif ($populationStatus['severe'] > 0 && $concernedRate >= 0.40) {
+
+            $remark = sprintf(
+                'High nutrition concern: %d of %d assessed individuals (%.1f%%) are classified as at risk, moderate, or severe, including %d severe case(s). Strengthened barangay nutrition intervention is recommended.',
+                $concernedPopulation,
+                $total,
+                $concernedRate * 100,
+                $populationStatus['severe']
+            );
+
+        } elseif ($populationStatus['severe'] > 0) {
+
+            $remark = sprintf(
+                'Nutrition concerns require attention: %d severe case(s) were identified among %d assessed individuals. Targeted follow-up and monitoring are recommended.',
+                $populationStatus['severe'],
+                $total
+            );
+
+        } elseif ($moderateRate >= 0.20 || $concernedRate >= 0.40) {
+
+            $remark = sprintf(
+                'Moderate nutrition risk: %d of %d assessed individuals (%.1f%%) are classified as at risk or moderate. Barangay nutrition monitoring and preventive interventions should be strengthened.',
+                $concernedPopulation,
+                $total,
+                $concernedRate * 100
+            );
+
+        } elseif ($atRiskRate >= 0.20 || $moderateRate > 0) {
+
+            $remark = sprintf(
+                'Nutrition concerns are present: %d of %d assessed individuals (%.1f%%) require monitoring because they are classified as at risk or moderate. Preventive action and regular follow-up are recommended.',
+                $concernedPopulation,
+                $total,
+                $concernedRate * 100
+            );
+
+        } elseif ($atRiskRate > 0) {
+
+            $remark = sprintf(
+                'The overall nutrition situation is generally stable, but %d individual(s) are classified as at risk and should continue to receive appropriate monitoring.',
+                $populationStatus['at_risk']
+            );
+
         } else {
-            $remark = 'Barangay nutrition status is stable.';
+
+            $remark = sprintf(
+                'The assessed population currently shows a generally stable nutrition status, with no individuals classified as at risk, moderate, or severe in the available records.'
+            );
         }
 
         /*
@@ -386,6 +749,18 @@ class SummaryService
             'children' => $child,
             'adults' => $adult,
             'pregnant_women' => $pregnant,
+
+            /*
+            | Additional overall status data for dashboards and charts.
+            */
+            'overall_status' => [
+                'total' => $total,
+                'healthy' => $populationStatus['healthy'],
+                'at_risk' => $populationStatus['at_risk'],
+                'moderate' => $populationStatus['moderate'],
+                'severe' => $populationStatus['severe'],
+                'concerned_total' => $concernedPopulation,
+            ],
         ];
 
         /*
@@ -400,7 +775,9 @@ class SummaryService
             'end_date' => $endDate,
             'total_population' => $total,
 
-            // CHILDREN
+            /*
+            | CHILDREN
+            */
             'child_total' => $child['total'],
             'child_underweight' => $child['underweight'],
             'child_stunted' => $child['stunted'],
@@ -412,7 +789,9 @@ class SummaryService
             'child_moderate' => $child['moderate'],
             'child_severe' => $child['severe'],
 
-            // ADULTS
+            /*
+            | ADULTS
+            */
             'adult_total' => $adult['total'],
             'adult_wasted' => $adult['wasted'],
             'adult_overweight' => $adult['overweight'],
@@ -422,13 +801,18 @@ class SummaryService
             'adult_moderate' => $adult['moderate'],
             'adult_severe' => $adult['severe'],
 
-            // PREGNANT WOMEN
+            /*
+            | PREGNANT WOMEN
+            */
             'pregnant_total' => $pregnant['total'],
             'pregnant_healthy' => $pregnant['healthy'],
             'pregnant_at_risk' => $pregnant['at_risk'],
             'pregnant_moderate' => $pregnant['moderate'],
             'pregnant_severe' => $pregnant['severe'],
 
+            /*
+            | REPORT RESULTS
+            */
             'remark' => $remark,
             'recommendations' => $recommendations,
             'chart_data' => $chartData,
